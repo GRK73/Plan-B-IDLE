@@ -1,0 +1,388 @@
+.stat-modal {
+  width: 900px;
+  max-width: 95%;
+}
+
+.stat-layout {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stat-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 좌측 열: 캐릭터 정보 */
+.left-col {
+  flex: 0 0 200px;
+  align-items: center;
+}
+
+.stat-card-visual {
+  width: 140px;
+  height: 180px;
+  background: white;
+  border-radius: 12px;
+  position: relative;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+  margin-bottom: 12px;
+  border: 4px solid #333;
+  overflow: hidden;
+}
+
+.stat-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #eee;
+}
+
+.stat-char-name {
+  font-size: 1.4rem;
+  margin: 0 0 10px 0;
+  color: white;
+  text-shadow: 1px 1px 3px black;
+}
+
+/* 클릭 가능한 카드 효과 */
+.clickable-card {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.clickable-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 25px rgba(0,0,0,0.7);
+}
+
+.clickable-card:hover .card-click-hint {
+  opacity: 1;
+}
+
+.card-click-hint {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  text-align: center;
+  padding: 5px 0;
+  font-size: 0.8rem;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+/* 카드 확대 오버레이 */
+.expanded-card-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  cursor: zoom-out;
+  animation: fadeIn 0.3s ease-out;
+  backdrop-filter: blur(5px);
+}
+
+.expanded-card-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 20px;
+  border: 6px solid #333;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  animation: zoomIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes zoomIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 티어별 테두리 및 뱃지 색상 (가차 모달과 통일) */
+.tier-bg-C { background: #2ecc71; }
+.tier-bg-U { background: #bdc3c7; }
+.tier-bg-R { background: #f1c40f; }
+.tier-bg-SR { background: linear-gradient(45deg, #fdfbfb, #ebedee); }
+
+.tier-border-C { border-color: #2ecc71; }
+.tier-border-U { border-color: #bdc3c7; }
+.tier-border-R { border-color: #f1c40f; }
+.tier-border-SR {
+  border-color: #f8f9fa;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.6), inset 0 0 10px rgba(0, 255, 255, 0.3);
+}
+.points-badge {
+  background: #ff4757;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 1rem;
+  font-weight: bold;
+  width: 100%;
+  text-align: center;
+}
+
+/* 중앙 열: 레이더 차트 및 전투 정보 */
+.mid-col {
+  flex: 0 0 250px;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 10px;
+}
+
+.radar-chart-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.combat-stats-summary {
+  width: 100%;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid #444;
+}
+
+.combat-stats-summary h4 {
+  margin: 0 0 10px 0;
+  color: #f1c40f;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.combat-stats-summary ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.85rem;
+  color: #ddd;
+}
+
+.combat-stats-summary li {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.combat-stats-summary li:last-child {
+  margin-bottom: 0;
+}
+
+.radar-bg {
+  fill: rgba(255, 255, 255, 0.03);
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1;
+}
+
+.radar-axis {
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1;
+}
+
+.radar-data {
+  fill: rgba(46, 204, 113, 0.4);
+  stroke: #2ecc71;
+  stroke-width: 2;
+  transition: all 0.3s ease-out;
+}
+
+.radar-label {
+  fill: #ccc;
+  font-size: 12px;
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+/* 우측 열: 스탯 리스트 및 돌파 */
+.right-col {
+  flex: 1;
+}
+
+.stat-list {
+  background: rgba(0,0,0,0.2);
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.auto-distribute-btn-small {
+  background: linear-gradient(45deg, #9b59b6, #8e44ad);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(155, 89, 182, 0.4);
+  transition: transform 0.2s, filter 0.2s;
+}
+
+.auto-distribute-btn-small:hover {
+  transform: scale(1.05);
+  filter: brightness(1.2);
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  gap: 15px;
+}
+
+.stat-item:last-child {
+  margin-bottom: 0;
+}
+
+/* 툴팁을 위한 래퍼 설정 */
+.stat-name-tooltip-wrapper {
+  position: relative;
+  width: 90px;
+  cursor: help;
+}
+
+.stat-name {
+  font-size: 0.95rem;
+  font-weight: bold;
+  color: #fff;
+  border-bottom: 1px dotted #888; /* 툴팁이 있다는 시각적 힌트 */
+}
+
+.stat-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: 120%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 20, 20, 0.95);
+  border: 1px solid #555;
+  color: #ddd;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  z-index: 10;
+  transition: opacity 0.2s, visibility 0.2s;
+  pointer-events: none;
+}
+
+.stat-tooltip div {
+  margin-bottom: 4px;
+}
+.stat-tooltip div:last-child {
+  margin-bottom: 0;
+}
+.stat-tooltip strong {
+  color: #f1c40f;
+}
+
+.stat-name-tooltip-wrapper:hover .stat-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+.stat-bar-bg {
+  flex: 1;
+  height: 16px;
+  background: #111;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3498db, #2ecc71);
+  transition: width 0.3s ease;
+}
+
+.stat-value {
+  width: 100px;
+  text-align: right;
+  font-size: 0.9rem;
+  color: #aaa;
+  white-space: nowrap;
+}
+
+.invest-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background-color: #ffd700;
+  color: #222;
+  font-weight: bold;
+  font-size: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s;
+}
+
+.invest-btn:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.invest-btn:disabled {
+  background-color: #555;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.breakthrough-section {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.breakthrough-btn {
+  width: 100%;
+  padding: 18px;
+  font-size: 1.3rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  transition: all 0.3s;
+}
+
+.breakthrough-btn.ready {
+  background: linear-gradient(45deg, #ff4757, #ff6b81);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(255, 71, 87, 0.5);
+  animation: pulse 1.5s infinite;
+}
+
+.breakthrough-btn.ready:hover {
+  transform: scale(1.05);
+}
+
+.breakthrough-btn.not-ready, .breakthrough-btn.need-points {
+  background: #444;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.breakthrough-hint {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
+}

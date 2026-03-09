@@ -1,0 +1,175 @@
+.gacha-fullscreen-overlay {
+  background: rgba(0, 0, 0, 0.85); /* 화면 전체를 어둡게 */
+  flex-direction: column;
+}
+
+.gacha-fullscreen-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.gacha-title {
+  color: #ffd700;
+  font-size: 2.5rem;
+  margin-bottom: 40px;
+  text-shadow: 0 4px 10px rgba(0,0,0,0.8);
+}
+
+.gacha-result-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 25px;
+  justify-content: center;
+  max-width: 900px;
+}
+
+.gacha-card-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0;
+  animation: cardPopIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.gacha-card-visual {
+  width: 140px;
+  height: 180px;
+  background: white;
+  border-radius: 12px;
+  position: relative;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+  margin-bottom: 12px;
+  border: 4px solid #333;
+  overflow: hidden;
+}
+
+.gacha-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #eee;
+}
+
+.gacha-card-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+@keyframes cardPopIn {
+  0% { transform: scale(0.3) translateY(50px) rotate(-10deg); opacity: 0; }
+  100% { transform: scale(1) translateY(0) rotate(0); opacity: 1; }
+}
+
+/* 티어별 색상 및 효과 */
+.tier-bg-C { background: #2ecc71; }
+.tier-bg-U { background: #bdc3c7; }
+.tier-bg-R { background: #f1c40f; }
+.tier-bg-SR { background: linear-gradient(45deg, #fdfbfb, #ebedee); }
+
+.tier-border-C { border-color: #2ecc71; }
+.tier-border-U { border-color: #bdc3c7; }
+.tier-border-R { border-color: #f1c40f; }
+.tier-border-SR {
+  border-color: #f8f9fa;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.6), inset 0 0 10px rgba(0, 255, 255, 0.3);
+}
+.gacha-actions-bottom {
+  margin-top: 50px;
+  display: flex;
+  gap: 15px;
+}
+
+.gacha-btn-action {
+  padding: 15px 30px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.2s, filter 0.2s;
+  color: white;
+}
+
+.gacha-btn-action.pull { background: #34495e; border: 2px solid #555; }
+.gacha-btn-action.max-btn { background: linear-gradient(45deg, #e74c3c, #c0392b); border: none; box-shadow: 0 4px 10px rgba(231, 76, 60, 0.5); }
+.gacha-btn-action.confirm { background: #2ecc71; color: #111; }
+
+.gacha-btn-action:hover {
+  transform: scale(1.05);
+  filter: brightness(1.2);
+}
+
+/* 대량 뽑기(Bulk) 그리드 스타일 */
+.gacha-bulk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+  max-width: 1000px;
+  width: 90%;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 20px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 15px;
+  border: 2px solid #333;
+}
+
+.gacha-bulk-item {
+  display: flex;
+  align-items: center;
+  background: #2a2a2a;
+  border-radius: 10px;
+  padding: 10px;
+  gap: 15px;
+  border: 1px solid #444;
+  opacity: 0;
+  animation: fadeSlideRight 0.3s ease-out forwards;
+}
+
+@keyframes fadeSlideRight {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.bulk-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid;
+  background: white;
+}
+
+.bulk-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bulk-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.bulk-tier {
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.bulk-name {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: white;
+}
+
+.bulk-count {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #f1c40f;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}

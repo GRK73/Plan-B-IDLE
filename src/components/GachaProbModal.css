@@ -1,0 +1,39 @@
+.prob-modal {
+  width: 600px;
+  max-width: 95%;
+}
+
+.prob-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.prob-table th, .prob-table td {
+  padding: 12px 10px;
+  text-align: center;
+  border-bottom: 1px solid #444;
+}
+
+.prob-table th {
+  background: #333;
+  color: #ffd700;
+  font-weight: bold;
+}
+
+.prob-table tr.current-level {
+  background: rgba(46, 204, 113, 0.2);
+  font-weight: bold;
+  color: #2ecc71;
+}
+
+.prob-note {
+  font-size: 0.85rem;
+  color: #aaa;
+  text-align: right;
+  margin-top: 10px;
+}

@@ -1,0 +1,576 @@
+.combat-screen-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('../assets/images/fight_background.PNG') center/cover no-repeat;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.combat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  background: rgba(0, 0, 0, 0.5);
+  border-bottom: 2px solid #333;
+}
+
+.combat-header h2 {
+  margin: 0;
+  color: #ff4757;
+  font-size: 2rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.combat-close-btn {
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: bold;
+  background: #34495e;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.combat-close-btn:hover {
+  background: #2c3e50;
+}
+
+.combat-global-stats {
+  text-align: center;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #2ecc71;
+  font-weight: bold;
+  font-size: 1.2rem;
+  border-bottom: 1px solid #222;
+}
+
+.battlefield {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+  padding: 40px;
+}
+
+/* 좌측: 아군 진영 */
+.ally-zone {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ally-party-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 40px;
+}
+
+.ally-character-wrapper {
+  width: 120px;
+  height: auto;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  position: relative;
+}
+
+.ceo-aura .ally-sprite {
+  filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 25px rgba(255, 215, 0, 0.6));
+  animation: auraPulse 2s infinite alternate, allyHover 2s ease-in-out infinite alternate;
+}
+
+@keyframes auraPulse {
+  0% {
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 20px rgba(255, 215, 0, 0.4));
+  }
+
+  100% {
+    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 35px rgba(255, 215, 0, 0.7));
+  }
+}
+
+.ally-tier-badge {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  font-weight: bold;
+  font-size: 1.2rem;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 6px;
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.ally-sprite {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.5));
+  animation: allyHover 2s ease-in-out infinite alternate;
+  flex-shrink: 0;
+}
+
+@keyframes allyHover {
+  0% {
+    transform: translateY(0);
+  }
+
+  100% {
+    transform: translateY(-5px);
+  }
+}
+
+.ally-name {
+  color: white;
+  font-weight: bold;
+  font-size: 1rem;
+  margin-top: 10px;
+  text-shadow: 1px 1px 3px black;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.empty-slot-marker {
+  width: 100px;
+  height: 100px;
+  border: 2px dashed #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  border-radius: 12px;
+  font-weight: bold;
+}
+
+/* 우측: 적군(보스) 진영 */
+.enemy-zone {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.boss-character-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 아군 상태 클래스 (파티 전체 애니메이션) */
+.ally-attack {
+  animation: allyLunge 0.15s ease-out forwards;
+}
+
+.ally-burst {
+  animation: allyBurst 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  filter: drop-shadow(0 0 20px #3498db);
+}
+
+@keyframes allyLunge {
+  0% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(30px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes allyBurst {
+  0% {
+    transform: translateX(0) scale(1);
+  }
+
+  50% {
+    transform: translateX(50px) scale(1.1);
+  }
+
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* 파티 HP 바 제거 (개별 HP 바 사용) */
+.char-hp-bar-container {
+  width: 100px;
+  height: 12px;
+  min-height: 12px;
+  background: #222;
+  border-radius: 6px;
+  border: 1px solid #111;
+  overflow: hidden;
+  margin-top: 5px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.char-hp-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #2ecc71;
+  /* 단색으로 변경하여 크로스 브라우저/그래픽 가속 오류 방지 */
+  transition: width 0.2s ease;
+}
+
+/* 데미지 텍스트 애니메이션 */
+.floating-damage {
+  position: absolute;
+  font-family: 'PlanB', sans-serif;
+  font-weight: bold;
+  pointer-events: none;
+  z-index: 1000;
+  animation: floatUp 0.8s ease-out forwards;
+}
+
+.dmg-normal {
+  color: white;
+  font-size: 2.5rem;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.8), 0 0 4px #e67e22;
+}
+
+.dmg-crit {
+  color: #f1c40f;
+  font-size: 4rem;
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.9), 0 0 10px #e74c3c;
+  animation: floatUpCrit 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.dmg-enemy {
+  color: #e74c3c;
+  font-size: 2.5rem;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.8), 0 0 4px #8e44ad;
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translateY(0) scale(0.5);
+    opacity: 1;
+  }
+
+  20% {
+    transform: translateY(-20px) scale(1.2);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-80px) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes floatUpCrit {
+  0% {
+    transform: translateY(0) scale(0.5) rotate(-5deg);
+    opacity: 1;
+  }
+
+  20% {
+    transform: translateY(-30px) scale(1.5) rotate(5deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-100px) scale(1) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+/* 아군 개별 상태 클래스 */
+.ally-attack {
+  animation: allyLunge 0.15s ease-out forwards;
+}
+
+.ally-burst {
+  animation: allyBurst 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  filter: drop-shadow(0 0 20px #3498db);
+}
+
+.ally-hit {
+  animation: shake 0.2s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+.dead-slot {
+  filter: grayscale(100%) brightness(0.3);
+  opacity: 0.6;
+}
+
+@keyframes allyLunge {
+  0% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(30px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes allyBurst {
+  0% {
+    transform: translateX(0) scale(1);
+  }
+
+  50% {
+    transform: translateX(50px) scale(1.1);
+  }
+
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes shake {
+
+  10%,
+  90% {
+    transform: translate3d(-5px, 0, 0);
+  }
+
+  20%,
+  80% {
+    transform: translate3d(5px, 0, 0);
+  }
+
+  30%,
+  50%,
+  70% {
+    transform: translate3d(-10px, 0, 0);
+  }
+
+  40%,
+  60% {
+    transform: translate3d(10px, 0, 0);
+  }
+}
+
+/* 보스 상태 클래스 */
+.boss-entering {
+  animation: bossSlideIn 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.boss-fighting.boss-idle {
+  animation: bossHover 3s ease-in-out infinite alternate;
+}
+
+.boss-attack {
+  animation: bossLunge 0.2s ease-in forwards;
+}
+
+.boss-hit {
+  animation: bossFlash 0.15s ease-out;
+}
+
+.boss-stunned {
+  animation: bossStunShake 0.5s infinite;
+  filter: grayscale(80%) sepia(50%);
+}
+
+@keyframes bossLunge {
+  0% {
+    transform: translateX(0);
+  }
+
+  50% {
+    transform: translateX(-50px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes bossFlash {
+  0% {
+    filter: brightness(2) drop-shadow(0 0 20px white);
+    transform: translateX(20px);
+  }
+
+  100% {
+    filter: brightness(1);
+    transform: translateX(0);
+  }
+}
+
+@keyframes bossStunShake {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(2deg);
+  }
+
+  50% {
+    transform: rotate(0deg);
+  }
+
+  75% {
+    transform: rotate(-2deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.stun-marker {
+  position: absolute;
+  top: -40px;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 0 2px 4px black;
+  animation: bounceStun 0.5s infinite alternate;
+}
+
+@keyframes bounceStun {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(-10px);
+  }
+}
+
+.boss-dead-text {
+  font-size: 5rem;
+  font-weight: bold;
+  color: #e74c3c;
+  text-shadow: 0 5px 15px rgba(0, 0, 0, 0.8);
+  animation: fadeOutUp 1.5s forwards;
+}
+
+@keyframes fadeOutUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-100px) scale(1.5);
+  }
+}
+
+/* 게임 오버 화면 */
+.game-over-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #e74c3c;
+  animation: fadeIn 1s forwards;
+}
+
+.game-over-overlay h1 {
+  font-size: 4rem;
+  margin-bottom: 10px;
+}
+
+@keyframes bossSlideIn {
+  from {
+    transform: translateX(300px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes bossHover {
+  0% {
+    transform: translateY(0);
+  }
+
+  100% {
+    transform: translateY(-15px);
+  }
+}
+
+.boss-sprite {
+  width: 300px;
+  height: 300px;
+  object-fit: contain;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.5));
+  margin-bottom: 20px;
+}
+
+.boss-name {
+  font-size: 2rem;
+  color: #ff4757;
+  margin: 0 0 5px 0;
+  text-shadow: 0 2px 10px rgba(255, 71, 87, 0.5);
+}
+
+.boss-stats {
+  font-size: 1.2rem;
+  color: #aaa;
+  font-weight: bold;
+}
+
+.boss-hp-bar-container {
+  width: 300px;
+  height: 25px;
+  background: #222;
+  border-radius: 12px;
+  border: 2px solid #111;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 15px;
+}
+
+.boss-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c0392b, #e74c3c);
+  transition: width 0.2s ease;
+}
+
+.boss-hp-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-weight: bold;
+  font-size: 0.9rem;
+  text-shadow: 1px 1px 2px black;
+}

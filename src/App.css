@@ -1,0 +1,712 @@
+.game-overlay {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  background-color: transparent;
+}
+
+.game-overlay.normal {
+  background: url('./assets/images/backgroud.png') center/cover no-repeat;
+}
+
+.game-overlay.chroma {
+  background: transparent;
+}
+
+/* 좌측 스탯 패널 */
+.stat-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 320px;
+  background: rgba(20, 20, 20, 0.85);
+  border: 2px solid #555;
+  border-radius: 12px;
+  padding: 20px;
+  color: white;
+  z-index: 200;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+}
+
+.stat-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #ffd700;
+}
+
+.points-badge {
+  background: #ff4757;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  gap: 10px;
+}
+
+.stat-name {
+  width: 100px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.stat-bar-bg {
+  flex: 1;
+  height: 12px;
+  background: #333;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3498db, #2ecc71);
+  transition: width 0.3s ease;
+}
+
+.stat-value {
+  width: 40px;
+  text-align: right;
+  font-size: 0.8rem;
+  color: #aaa;
+}
+
+.invest-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  border: none;
+  background-color: #ffd700;
+  color: #222;
+  font-weight: bold;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.invest-btn:disabled {
+  background-color: #555;
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* 우측 재화 패널 */
+.ui-layer {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  z-index: 200;
+}
+
+.poong-box {
+  background: rgba(0, 0, 0, 0.8);
+  color: #ffd700;
+  padding: 12px 20px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 2px solid #444;
+}
+
+.poong-box img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.poong-texts {
+  display: flex;
+  flex-direction: column;
+}
+
+.poong-amount {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.tat-box {
+  background: rgba(0, 0, 0, 0.8);
+  color: #8e44ad; /* 보라색 계열로 탓 색상 지정 */
+  padding: 12px 20px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 2px solid #444;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.tat-box:hover {
+  transform: translateY(-2px);
+  border-color: #8e44ad;
+}
+
+.tat-amount {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.tps-amount {
+  font-size: 0.8rem;
+  color: #2ecc71;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gacha-info-panel {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #555;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  margin-bottom: 5px;
+  width: fit-content;
+  align-self: flex-end;
+}
+
+.gacha-level {
+  color: #ffd700;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.gacha-rolls {
+  color: #aaa;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.gacha-prob-btn {
+  background: #34495e;
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  width: 100%;
+}
+.gacha-prob-btn:hover {
+  background: #2c3e50;
+}
+
+.main-circle-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.gacha-button-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.gacha-trigger-btn {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid #ffd700;
+  background: #2a2a2a;
+  cursor: pointer;
+  padding: 8px;
+  box-shadow: 0 4px 15px rgba(255,215,0,0.4);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.gacha-trigger-btn:hover, .gacha-trigger-btn.active {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(255,215,0,0.6);
+}
+
+.gacha-trigger-btn.book-btn {
+  border-color: #3498db;
+  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.4);
+}
+
+.gacha-trigger-btn.book-btn:hover {
+  box-shadow: 0 6px 20px rgba(52, 152, 219, 0.6);
+}
+
+.gacha-trigger-btn.combat-circle-btn {
+  border-color: #e74c3c;
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+  background: #2a1111;
+}
+
+.gacha-trigger-btn.combat-circle-btn:hover {
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.6);
+}
+
+.gacha-trigger-btn.mode-circle-btn {
+  border-color: #9b59b6;
+  box-shadow: 0 4px 15px rgba(155, 89, 182, 0.4);
+  background: #1e1423;
+}
+
+.gacha-trigger-btn.mode-circle-btn:hover {
+  box-shadow: 0 6px 20px rgba(155, 89, 182, 0.6);
+}
+
+.emoji-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.gacha-trigger-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.gacha-options-menu {
+  position: absolute;
+  right: 85px; /* 버튼 왼쪽에 뜨도록 위치 조정 */
+  display: flex;
+  gap: 8px;
+  animation: slideInRight 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.gacha-options-menu button {
+  padding: 12px 10px;
+  border-radius: 8px;
+  border: 2px solid #555;
+  background: #333;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.gacha-options-menu button:hover {
+  background: #444;
+  border-color: #ffd700;
+  transform: translateY(-2px);
+}
+
+.gacha-options-menu button.max-btn {
+  background: linear-gradient(45deg, #e74c3c, #c0392b);
+  border-color: #e74c3c;
+}
+
+.menu-btn {
+  padding: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, filter 0.2s;
+}
+.menu-btn:hover {
+  transform: scale(1.02);
+  filter: brightness(1.2);
+}
+
+.gacha-btn-main { background-color: #9b59b6; box-shadow: 0 0 10px rgba(155, 89, 182, 0.5); }
+.collection-btn { background-color: #34495e; border: 1px solid #555; }
+.combat-btn { background-color: #e74c3c; border: 1px solid #c0392b; margin-top: 10px; }
+
+.back-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  color: white;
+  transition: filter 0.2s;
+  background-color: #444; 
+  font-size: 0.9rem; 
+}
+
+.back-btn:hover { filter: brightness(1.2); }
+
+/* 좌상단 스킬 패널 */
+.skills-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: flex;
+  gap: 15px;
+  z-index: 200;
+}
+
+.skill-icon-wrapper {
+  width: 80px;
+  height: 80px;
+  background: #333;
+  border-radius: 12px;
+  border: 2px solid #555;
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: transform 0.2s, border-color 0.2s;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+.skill-icon-wrapper:hover {
+  transform: translateY(-5px);
+  border-color: #ffd700;
+}
+
+.skill-icon-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.5;
+  filter: grayscale(80%);
+}
+
+.skill-icon-wrapper.unlocked img {
+  opacity: 1;
+  filter: none;
+}
+
+.skill-name {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background: rgba(0,0,0,0.8);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-align: center;
+  padding: 3px 0;
+}
+
+.skill-lock {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ff4757;
+  font-size: 0.85rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+.skill-cd {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f1c40f;
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-shadow: 2px 2px 4px black;
+  z-index: 5;
+}
+
+.skill-linked {
+  position: absolute;
+  top: -5px; right: -5px;
+  background: #2ecc71;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 2px solid #222;
+  z-index: 5;
+}
+
+/* 모드 선택 화면 */
+.mode-selection-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #111;
+  position: relative;
+  z-index: 1000;
+}
+
+.intro-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+}
+
+.intro-icon {
+  width: 300px;
+  height: auto;
+  object-fit: contain;
+  animation: dropThud 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  filter: drop-shadow(0 10px 15px rgba(0,0,0,0.6));
+}
+
+@keyframes dropThud {
+  0% { transform: translateY(-400px) scale(1.1); opacity: 0; }
+  60% { transform: translateY(20px) scale(0.9); opacity: 1; }
+  80% { transform: translateY(-10px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.intro-buttons {
+  display: flex;
+  gap: 20px;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.metal-btn {
+  background: linear-gradient(to bottom, #f0f0f0 0%, #b8b8b8 48%, #9e9e9e 50%, #d4d4d4 100%);
+  border: 2px solid #555;
+  box-shadow: 
+    inset 0 1px 0 rgba(255,255,255,0.8), 
+    0 5px 10px rgba(0,0,0,0.7), 
+    0 1px 2px rgba(0,0,0,0.5);
+  color: #222;
+  font-weight: 900;
+  font-size: 1.2rem;
+  text-shadow: 0 1px 1px rgba(255,255,255,0.9);
+  padding: 15px 40px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.metal-btn:hover {
+  filter: brightness(1.1);
+}
+
+.metal-btn:active {
+  transform: translateY(3px);
+  box-shadow: 
+    inset 0 2px 4px rgba(0,0,0,0.4), 
+    0 2px 5px rgba(0,0,0,0.8);
+}
+
+.selection-card {
+  background: #2a2a2a;
+  padding: 50px;
+  border-radius: 25px;
+  text-align: center;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+  border: 1px solid #333;
+}
+
+.selection-card h1 {
+  margin-bottom: 30px;
+  font-size: 2.5rem;
+  background: linear-gradient(45deg, #ffd700, #ff8c00);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.button-group {
+  display: flex;
+  gap: 30px;
+}
+
+.mode-btn {
+  padding: 20px 40px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 15px;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.mode-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+}
+
+.mode-btn.normal { background-color: #3498db; color: white; }
+.mode-btn.chroma { background-color: #2ecc71; color: white; }
+
+.character-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+}
+
+canvas {
+  display: block;
+}
+
+/* 글로벌 모달 애니메이션 및 오버레이 기본 스타일 */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: auto;
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.modal-content {
+  background: #2a2a2a;
+  border: 2px solid #555;
+  border-radius: 15px;
+  padding: 30px;
+  color: white;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  max-width: 95%;
+  animation: popModal 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.close-btn {
+  position: absolute;
+  top: 15px; 
+  right: 20px;
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.close-btn:hover { 
+  color: white; 
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes popModal {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 모달 닫힘 애니메이션 */
+.modal-closing .modal-overlay {
+  animation: fadeOut 0.2s ease-in forwards;
+}
+
+.modal-closing .modal-content {
+  animation: popDown 0.2s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+}
+
+@keyframes popDown {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(0.9); opacity: 0; }
+}
+
+/* Global Tier Badge Text & Colors */
+.card-tier-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  font-weight: 900;
+  font-size: 1.1rem;
+  z-index: 10;
+}
+
+.ally-tier-badge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.tier-color-SR { color: #f8f9fa; text-shadow: 0 0 8px rgba(255, 255, 255, 0.9), 0 0 15px rgba(0, 255, 255, 0.7), 0 0 20px rgba(255, 0, 255, 0.7); }
+.tier-color-R { color: #f1c40f; text-shadow: 0 0 8px rgba(241, 196, 15, 0.8), 0 0 15px rgba(241, 196, 15, 0.5); }
+.tier-color-U { color: #bdc3c7; text-shadow: 0 0 8px rgba(189, 195, 199, 0.8), 0 0 15px rgba(189, 195, 199, 0.5); }
+.tier-color-C { color: #2ecc71; text-shadow: 0 0 8px rgba(46, 204, 113, 0.8); }
+
+.tier-border-C { border-color: #2ecc71 !important; }
+
+.tier-border-U { 
+  border-color: #bdc3c7 !important; 
+  box-shadow: 0 0 10px rgba(189, 195, 199, 0.4), inset 0 0 8px rgba(189, 195, 199, 0.2) !important;
+}
+
+.tier-border-R { 
+  border-color: #f1c40f !important; 
+  box-shadow: 0 0 15px rgba(241, 196, 15, 0.5), inset 0 0 10px rgba(241, 196, 15, 0.3) !important;
+}
+
+@keyframes rainbowOpalGlow {
+  0% { 
+    border-color: #f8f9fa; 
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.6), inset 0 0 10px rgba(0, 255, 255, 0.4); 
+  }
+  33% { 
+    border-color: #fdfbfb; 
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.6), inset 0 0 10px rgba(255, 105, 180, 0.4); 
+  }
+  66% { 
+    border-color: #f0f8ff; 
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.6), inset 0 0 10px rgba(147, 112, 219, 0.4); 
+  }
+  100% { 
+    border-color: #f8f9fa; 
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.6), inset 0 0 10px rgba(0, 255, 255, 0.4); 
+  }
+}
+
+.tier-border-SR { 
+  animation: rainbowOpalGlow 4s linear infinite !important;
+}
