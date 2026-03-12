@@ -30,9 +30,10 @@ Zustand를 사용하여 게임의 핵심 데이터와 비즈니스 로직을 관
 * **`linkOshiSkill(charId)`**: "최애 지정" 발동. 특정 사원의 TPS 효율과 체력 배율을 폭발적으로 증가시킵니다. (오시 부스트 레벨에 따라 선택 가능 등급 확장)
 
 ### 🔄 환생, 리더보드, 디스크 방 및 최강자의 탑 액션
-* **`doRebirth()`**: 30스테이지 이상에서 활성화되며, 현재까지 모은 데이터를 초기화하고 탓(Tat)을 획득합니다. **닉네임이 설정되어 있다면 리더보드(Google Sheets)에 현재 스테이지를 자동으로 기록합니다.**
+* **`doRebirth()`**: 30스테이지 이상에서 활성화되며, 현재까지 모은 데이터를 초기화하고 탓(Tat)을 획득합니다. 100스테이지 이상이라면 심화 재화인 남탓(Nam-Tat)도 획득합니다. **닉네임이 설정되어 있다면 리더보드(Google Sheets)에 현재 스테이지를 자동으로 기록합니다.**
 * **`setNickname(name)`**: 사용자의 닉네임을 전역 상태에 저장합니다.
 * **`buyBuff(buffName)`**: 탓을 소모하여 영구적인 스펙(PermanentBuffs)을 구매합니다.
+* **`buyAdvancedBuff(buffName)`**: 남탓을 소모하여 극후반 전용 심화 특성(AdvancedBuffs)을 구매합니다.
 * **`finishGoldenDisk(totalDamage)`**: 황금 디스크 방 전투 종료 시 호출되며, 최고 기록을 경신할 경우 차액만큼의 **음표(Musical Notes)** 재화를 획득합니다.
 * **`upgradeDiskBuff(statType)`**: 음표를 소모하여 사원 전체의 기초 스탯을 영구적으로 % 단위로 뻥튀기합니다.
 * **`saveToTowerSlot(slotIndex, charId)`**: 현재 파티원의 강력한 상태(스냅샷)를 탑 슬롯에 박제합니다.
