@@ -17,6 +17,35 @@
   text-shadow: 0 2px 5px rgba(0,0,0,0.8);
 }
 
+.rebirth-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.rebirth-tab-btn {
+  background: #333;
+  color: #ccc;
+  border: 1px solid #555;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-family: 'PlanB', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rebirth-tab-btn:hover {
+  background: #444;
+}
+
+.rebirth-tab-btn.active {
+  background: #f1c40f;
+  color: #1a1a24;
+  font-weight: bold;
+  border-color: #f39c12;
+}
+
 .tat-balance {
   text-align: center;
   font-size: 1.5rem;

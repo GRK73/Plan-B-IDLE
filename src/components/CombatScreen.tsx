@@ -39,7 +39,7 @@ interface CombatChar {
 interface DamageText {
   id: number;
   value: number;
-  type: 'normal' | 'crit' | 'enemy' | 'supercrit';
+  type: 'normal' | 'crit' | 'enemy' | 'supercrit' | 'hypercrit';
   x: number;
   y: number;
   createdAt: number;
@@ -305,7 +305,7 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
       const now = Date.now();
       let dmgAdded = false;
 
-      const addDamage = (value: number, type: 'normal' | 'crit' | 'enemy' | 'supercrit', target: 'boss' | 'ally') => {
+      const addDamage = (value: number, type: 'normal' | 'crit' | 'enemy' | 'supercrit' | 'hypercrit', target: 'boss' | 'ally') => {
         const x = target === 'boss' ? 70 + Math.random() * 10 : 20 + Math.random() * 10;
         const y = target === 'boss' ? 30 + Math.random() * 20 : 40 + Math.random() * 20;
         st.dmgTexts.push({
@@ -320,6 +320,10 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
       const playbutton = towerArtifacts.find(a => a.id === 'playbutton');
       const superCritChance = playbutton ? playbutton.level * 0.05 : 0;
       const superCritMult = playbutton ? 2.0 + (playbutton.level * 0.5) : 2.0;
+
+      // 억까 당한 탓: 극크리 개방
+      const hyperCritLevel = useGameStore.getState().advancedBuffs.namTatHyperCritLevel || 0;
+      const hyperCritChance = hyperCritLevel * 0.05; // 레벨당 5%
 
       st.chars.forEach(char => {
         if (!char) return;
@@ -337,19 +341,24 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
 
           const isBurst = Math.random() < char.burstChance;
           let dmg = 0;
+          let dmgType: 'normal' | 'crit' | 'supercrit' | 'hypercrit' = 'normal';
 
           if (isBurst) {
             dmg = char.atk * char.burstMult;
+            dmgType = 'crit';
             
             if (Math.random() < superCritChance) {
-              // 초크리: 일반 크리 데미지 * (기본 200% + 레벨당 50%)
               dmg *= superCritMult; 
-              char.action = 'burst';
-              char.animTimer = 0.3;
-            } else {
-              char.action = 'burst';
-              char.animTimer = 0.3;
+              dmgType = 'supercrit';
+              
+              // 극크리 판정 (초크리가 터졌을 때만 굴림)
+              if (hyperCritChance > 0 && Math.random() < hyperCritChance) {
+                 dmg *= 3.0; // 3배 증폭
+                 dmgType = 'hypercrit';
+              }
             }
+            char.action = 'burst';
+            char.animTimer = 0.3;
           } else {
             dmg = char.atk;
             char.action = 'attack';
@@ -365,14 +374,7 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
             }
           }
 
-          if (isBurst) {
-            if (char.action === 'burst' && dmg > char.atk * char.burstMult) {
-               addDamage(dmg, 'supercrit', 'boss'); // Supercrit has higher base damage than normal crit anyway so this logic isn't perfect but sufficient to classify. Actually supercrit sets action burst.
-               // Let's re-eval: if supercritChance triggered, we logged supercrit.
-            } else {
-              // But wait, the previous code added the text INSIDE the if block. Let's restructure properly.
-            }
-          }
+          addDamage(dmg, dmgType, 'boss');
 
           if (mode === 'disk') {
             st.bossHp += dmg;

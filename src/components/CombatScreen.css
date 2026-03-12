@@ -242,6 +242,7 @@
   font-weight: bold;
   pointer-events: none;
   z-index: 1000;
+  will-change: transform, opacity; /* 최적화: 하드웨어 가속 힌트 제공 */
   animation: floatUp 0.8s ease-out forwards;
 }
 
@@ -264,6 +265,14 @@
   font-weight: 900;
   text-shadow: 0 0 10px #f1c40f, 0 0 20px #e74c3c, 0 0 30px white;
   animation: floatUpSuperCrit 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.dmg-hypercrit {
+  color: #ff00ff;
+  font-size: 8rem;
+  font-weight: 900;
+  text-shadow: 0 0 15px #00ffff, 0 0 30px #ff00ff, 0 0 45px white;
+  animation: floatUpHyperCrit 1.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
 .dmg-enemy {

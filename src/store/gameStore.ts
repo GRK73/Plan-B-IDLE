@@ -34,6 +34,14 @@ export interface PermanentBuffs {
   oshiBoostLevel: number;      // 최애 지정 등급업 레벨 (1: R가능, 2: SR가능)
 }
 
+export interface AdvancedBuffs {
+  namTatGachaDiscountLevel: number; // 내 잘못은 없어 (가챠 비용 % 할인)
+  namTatAspdBoostLevel: number;     // 손가락이 느린 탓 (공속 % 증가)
+  namTatTpsBoostLevel: number;      // 경제가 안 좋은 탓 (최종 생산 풍 % 증가)
+  namTatHyperCritLevel: number;     // 억까 당한 탓 (극크리 개방)
+  namTatDiskTimeLevel: number;      // 비겁한 변명 (디스크 방 시간 연장 & 초반 스킵)
+}
+
 export interface TowerCharacterSnapshot {
   id: string;
   name: string;
@@ -55,11 +63,14 @@ export interface TowerArtifact {
 interface GameState {
   poong: number;
   tat: number; // 환생 재화 '탓'
+  namTat: number; // 심화 환생 재화 '남탓'
+  maxStage: number; // 도달한 최고 스테이지
   musicalNotes: number; // 황금 디스크 방 재화 '음표'
   maxDiskDamage: number; // 황금 디스크 방 최고 기록
   diskBuffs: Stats; // 황금 디스크 방 스탯별 버프 레벨
 
   permanentBuffs: PermanentBuffs;
+  advancedBuffs: AdvancedBuffs;
   ownedCharacters: Record<string, OwnedCharacter>;
   activeRoster: string[]; // 현재 화면에 출근한 캐릭터 ID 목록 (최대 10명)
   totalTps: number;
@@ -119,6 +130,7 @@ interface GameState {
   // 환생 Actions
   doRebirth: () => void;
   buyBuff: (buffName: keyof PermanentBuffs) => void;
+  buyAdvancedBuff: (buffName: keyof AdvancedBuffs) => void;
 
   // 디스크 방 Actions
   finishGoldenDisk: (totalDamage: number) => void;
@@ -253,6 +265,8 @@ const _starter = getRandomStarter();
 export const useGameStore = create<GameState>((set, get) => ({
   poong: 10000, // 초기 자본금
   tat: 0,
+  namTat: 0,
+  maxStage: 1,
   musicalNotes: 0,
   maxDiskDamage: 0,
   diskBuffs: { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 },
@@ -275,6 +289,13 @@ export const useGameStore = create<GameState>((set, get) => ({
     enemyHpNerfLevel: 0,
     enemyAtkNerfLevel: 0,
     oshiBoostLevel: 0
+  },
+  advancedBuffs: {
+    namTatGachaDiscountLevel: 0,
+    namTatAspdBoostLevel: 0,
+    namTatTpsBoostLevel: 0,
+    namTatHyperCritLevel: 0,
+    namTatDiskTimeLevel: 0
   },
   ownedCharacters: {
     [_starter.id]: {
@@ -389,6 +410,12 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (state.currentStage < 30) return;
 
     const earnedTat = (state.currentStage - 30) * 10;
+    
+    // 100스테이지 초과 시 남탓 획득 (예: 100층에서 1개, 105층에서 2개 등)
+    let earnedNamTat = 0;
+    if (state.currentStage > 100) {
+      earnedNamTat = Math.floor((state.currentStage - 90) / 10);
+    }
 
     // 비동기로 리더보드에 점수 제출 (닉네임이 있을 경우에만)
     if (state.nickname) {
@@ -398,9 +425,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     // 랜덤 초기 캐릭터 선택
     const starter = getRandomStarter();
     const startPoong = 10000 + (state.permanentBuffs.startPoongLevel * 10000);
+    
+    // 비겁한 변명 스킵 레벨 적용 (최대 기존 스테이지를 넘지 못하도록 방어)
+    const skipLevel = state.advancedBuffs.namTatDiskTimeLevel; // 스킵과 디스크 시간 연장 통합
+    const startStage = Math.max(1, Math.min(state.currentStage - 1, 1 + (skipLevel * 5)));
 
     set({
       tat: state.tat + earnedTat,
+      namTat: state.namTat + earnedNamTat,
+      maxStage: Math.max(state.maxStage, state.currentStage),
       poong: startPoong,
       totalTps: 0,
       ownedCharacters: {
@@ -412,7 +445,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           permanentBonus: { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 }
         }
       },
-      currentStage: 1,
+      currentStage: startStage,
       totalRolls: 0,
       gachaLevel: 1,
       activeRoster: [starter.id],
@@ -483,6 +516,40 @@ export const useGameStore = create<GameState>((set, get) => ({
     };
   }),
 
+  buyAdvancedBuff: (buffName: keyof AdvancedBuffs) => set((state) => {
+    const buffs = { ...state.advancedBuffs };
+    let cost = 0;
+    const currentLevel = (buffs as any)[buffName];
+
+    switch (buffName) {
+      case 'namTatGachaDiscountLevel':
+        if (currentLevel >= 10) return state; // 최대 10레벨 (50%)
+        cost = 1 + currentLevel * 2;
+        break;
+      case 'namTatAspdBoostLevel':
+        cost = 2 + currentLevel * 3;
+        break;
+      case 'namTatTpsBoostLevel':
+        cost = 5 + currentLevel * 5;
+        break;
+      case 'namTatHyperCritLevel':
+        cost = 10 + currentLevel * 10;
+        break;
+      case 'namTatDiskTimeLevel':
+        cost = 3 + currentLevel * 3;
+        break;
+    }
+
+    if (state.namTat < cost) return state;
+
+    (buffs as any)[buffName] += 1;
+
+    return {
+      namTat: state.namTat - cost,
+      advancedBuffs: buffs
+    };
+  }),
+
   finishGoldenDisk: (totalDamage) => set((state) => {
     if (totalDamage > state.maxDiskDamage) {
       const diff = totalDamage - state.maxDiskDamage;
@@ -535,7 +602,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       tier: charInfo.tier,
       maxHp: Math.floor((200 + s.charm * 80) * rebirthMult * hpMult),
       atk: Math.floor(baseAtk * rebirthMult * tierMult),
-      aspd: 0.8 + (Math.log10(s.dance + 10) * 0.2),
+      aspd: (0.8 + (Math.log10(s.dance + 10) * 0.2)) * (1 + (state.advancedBuffs.namTatAspdBoostLevel * 0.1)),
       burstMult: 1.5 + (Math.log10(s.rap + 10) * 0.3) + (state.permanentBuffs.ruleBreakerLevel * 0.5),
       burstChance: Math.min((s.sense * 1) / 100, 0.5 + (state.permanentBuffs.ruleBreakerLevel * 0.05)),
       savedAt: Date.now()
@@ -958,6 +1025,11 @@ export const useGameStore = create<GameState>((set, get) => ({
         tps += calcCharTps(char.stats, state.permanentBuffs, char.id);
       }
     });
+
+    // 경제가 안 좋은 탓: 최종 생산 풍 % 증가 (레벨당 50%)
+    const namTatTpsMult = 1 + (state.advancedBuffs.namTatTpsBoostLevel * 0.5);
+    tps *= namTatTpsMult;
+
     return { totalTps: tps };
   }),
 
@@ -967,6 +1039,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get();
     // Revamped Gacha Discount: subtracts from totalRolls exponent instead of flat cost
     const rollDiscount = state.permanentBuffs.gachaDiscountLevel * 50;
+
+    // 내 잘못은 없어: 가챠 비용 % 할인 (레벨당 5%, 최대 50%)
+    const namTatDiscountMult = 1 - (Math.min(10, state.advancedBuffs.namTatGachaDiscountLevel) * 0.05);
 
     let pullTimes = typeof times === 'number' ? times : 10000;
     if (pullTimes <= 0) return [];
@@ -979,7 +1054,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     for (let i = 0; i < pullTimes; i++) {
       // 적용된 할인만큼 지수 증가폭을 지연시킵니다 (최소 0 방어)
       const discountedRolls = Math.max(0, currentRolls - rollDiscount);
-      const baseCost = 50 * Math.pow(1.0011, discountedRolls);
+      let baseCost = 50 * Math.pow(1.0011, discountedRolls);
+      
+      // 심화 남탓 할인 적용
+      baseCost *= namTatDiscountMult;
+      
       const singleCost = Math.max(10, Math.floor(baseCost));
 
       if (currentPoong < singleCost) {
@@ -1066,6 +1145,18 @@ export const useGameStore = create<GameState>((set, get) => ({
           savedState.permanentBuffs.oshiBoostLevel = savedState.permanentBuffs.oshiBoostLevel || 0;
         }
 
+        if (!savedState.advancedBuffs) {
+          savedState.advancedBuffs = {
+            namTatGachaDiscountLevel: 0,
+            namTatAspdBoostLevel: 0,
+            namTatTpsBoostLevel: 0,
+            namTatHyperCritLevel: 0,
+            namTatDiskTimeLevel: 0
+          };
+          savedState.namTat = 0;
+          savedState.maxStage = savedState.currentStage || 1;
+        }
+
         // 디스크 버프 기본값 복구 (이전 세이브 호환)
         if (!savedState.diskBuffs) {
           savedState.diskBuffs = { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 };
@@ -1099,7 +1190,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const state = get();
       // 저장 대상에서 actions들은 제외하고 순수 데이터만 추출
       const {
-        poong, tat, musicalNotes, maxDiskDamage, diskBuffs, permanentBuffs, ownedCharacters, activeRoster,
+        poong, tat, namTat, maxStage, musicalNotes, maxDiskDamage, diskBuffs, permanentBuffs, advancedBuffs, ownedCharacters, activeRoster,
         gachaLevel, totalRolls, combatParty, currentStage,
         bossSkillUnlocked, bossSkillCooldownEnd, ceoSkillUnlocked,
         ceoLinkedCharId, ceoLinkedStat, oshiSkillUnlocked, oshiLinkedCharId,
@@ -1108,7 +1199,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       } = state;
 
       const dataToSave = {
-        poong, tat, musicalNotes, maxDiskDamage, diskBuffs, permanentBuffs, ownedCharacters, activeRoster,
+        poong, tat, namTat, maxStage, musicalNotes, maxDiskDamage, diskBuffs, permanentBuffs, advancedBuffs, ownedCharacters, activeRoster,
         gachaLevel, totalRolls, combatParty, currentStage,
         bossSkillUnlocked, bossSkillCooldownEnd, ceoSkillUnlocked,
         ceoLinkedCharId, ceoLinkedStat, oshiSkillUnlocked, oshiLinkedCharId,
@@ -1130,6 +1221,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       const initialState = {
         poong: 10000, // 초기 자본금
         tat: 0,
+        namTat: 0,
+        maxStage: 1,
         musicalNotes: 0,
         maxDiskDamage: 0,
         diskBuffs: { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 },
@@ -1143,6 +1236,10 @@ export const useGameStore = create<GameState>((set, get) => ({
           hardTrainingLevel: 0, bossSkillBoostLevel: 0, ceoSkillBoostLevel: 0,
           gachaDiscountLevel: 0, vipGachaLevel: 0,
           enemyHpNerfLevel: 0, enemyAtkNerfLevel: 0, oshiBoostLevel: 0
+        },
+        advancedBuffs: {
+          namTatGachaDiscountLevel: 0, namTatAspdBoostLevel: 0, namTatTpsBoostLevel: 0,
+          namTatHyperCritLevel: 0, namTatDiskTimeLevel: 0
         },
         ownedCharacters: {
           [starter.id]: {

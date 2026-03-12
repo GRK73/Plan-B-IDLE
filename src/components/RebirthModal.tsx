@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGameStore, PermanentBuffs } from '../store/gameStore';
+import { useGameStore, PermanentBuffs, AdvancedBuffs } from '../store/gameStore';
 import './RebirthModal.css';
 
 interface Props {
@@ -8,21 +8,25 @@ interface Props {
 }
 
 type BuffKey = keyof PermanentBuffs;
+type AdvancedBuffKey = keyof AdvancedBuffs;
 
 interface BuffOption {
-  key: BuffKey;
+  key: BuffKey | AdvancedBuffKey;
   id: string;
   title: string;
   icon: string;
   description: string;
   getPreview: (level: number) => string;
   getCost: (level: number) => number;
+  isAdvanced?: boolean;
 }
 
 export function RebirthModal({ onClose, onShowToast }: Props) {
-  const { tat, permanentBuffs, buyBuff } = useGameStore();
+  const { tat, namTat, maxStage, permanentBuffs, advancedBuffs, buyBuff, buyAdvancedBuff } = useGameStore();
+  const [activeTab, setActiveTab] = useState<'tat' | 'namTat'>('tat');
 
   const buffOptions: BuffOption[] = [
+    // --- 탓 상점 (기존) ---
     {
       key: 'startPoongLevel',
       id: 'startPoongLevel',
@@ -121,35 +125,116 @@ export function RebirthModal({ onClose, onShowToast }: Props) {
       description: '최애로 지정할 수 있는 사원의 등급을 확장합니다. (1Lv: R등급 가능, 2Lv: SR등급 가능)',
       getPreview: (level) => level === 0 ? 'C, U 등급' : level === 1 ? 'C, U, R 등급' : level === 2 ? '모든 등급' : 'MAX',
       getCost: (level) => level >= 2 ? Infinity : 150 * (level + 1)
-    }];
+    },
+    // --- 남탓 상점 (심화) ---
+    {
+      key: 'namTatGachaDiscountLevel',
+      id: 'namTatGachaDiscountLevel',
+      title: '내 잘못은 없어',
+      icon: '💸',
+      description: '가챠(모집) 시 요구되는 풍 비용을 %로 직접 할인합니다.',
+      getPreview: (level) => level >= 10 ? 'MAX (50% 할인)' : `비용 ${level * 5}% 할인`,
+      getCost: (level) => level >= 10 ? Infinity : 1 + level * 2,
+      isAdvanced: true
+    },
+    {
+      key: 'namTatAspdBoostLevel',
+      id: 'namTatAspdBoostLevel',
+      title: '손가락이 느린 탓',
+      icon: '⚡',
+      description: '전투 시 모든 파티원(탑 포함)의 최종 공격 속도를 곱연산으로 증가시킵니다.',
+      getPreview: (level) => `공속 +${level * 10}%`,
+      getCost: (level) => 2 + level * 3,
+      isAdvanced: true
+    },
+    {
+      key: 'namTatTpsBoostLevel',
+      id: 'namTatTpsBoostLevel',
+      title: '경제가 안 좋은 탓',
+      icon: '🏭',
+      description: '초당 전체 풍 생산량(TPS) 최종 결과값을 % 단위로 곱연산 증폭시킵니다.',
+      getPreview: (level) => `최종 TPS +${level * 50}%`,
+      getCost: (level) => 5 + level * 5,
+      isAdvanced: true
+    },
+    {
+      key: 'namTatHyperCritLevel',
+      id: 'namTatHyperCritLevel',
+      title: '억까 당한 탓',
+      icon: '💥',
+      description: '초크리티컬 발동 시 한 번 더 배율이 곱해지는 [극크리티컬]을 해방합니다.',
+      getPreview: (level) => `발동 확률 ${level * 5}% (3배 데미지)`,
+      getCost: (level) => 10 + level * 10,
+      isAdvanced: true
+    },
+    {
+      key: 'namTatDiskTimeLevel',
+      id: 'namTatDiskTimeLevel',
+      title: '비겁한 변명',
+      icon: '⏳',
+      description: '황금 디스크 방 제한 시간을 늘리고, 환생 직후 시작 스테이지를 점프합니다.',
+      getPreview: (level) => `시간 +${level * 3}초 / 환생 시 ${1 + level * 5} 스테이지부터 시작`,
+      getCost: (level) => 3 + level * 3,
+      isAdvanced: true
+    }
+  ];
 
-  const [selectedBuffId, setSelectedBuffId] = useState<string>(buffOptions[0].id);
+  const currentOptions = buffOptions.filter(o => activeTab === 'namTat' ? o.isAdvanced : !o.isAdvanced);
+  const [selectedBuffId, setSelectedBuffId] = useState<string>(currentOptions[0].id);
 
-  const selectedOption = buffOptions.find(o => o.id === selectedBuffId) || buffOptions[0];
-  const currentLevel = permanentBuffs[selectedOption.key] || 0;
+  const selectedOption = buffOptions.find(o => o.id === selectedBuffId) || currentOptions[0];
+  const currentLevel = activeTab === 'namTat'
+    ? advancedBuffs[selectedOption.key as AdvancedBuffKey] || 0
+    : permanentBuffs[selectedOption.key as BuffKey] || 0;
+  
   const cost = selectedOption.getCost(currentLevel);
 
   const handleBuy = () => {
-    if (tat < cost) {
-      onShowToast('탓(Tat)이 부족합니다!');
-      return;
+    if (activeTab === 'namTat') {
+      if (namTat < cost) {
+        onShowToast('남탓이 부족합니다!');
+        return;
+      }
+      buyAdvancedBuff(selectedOption.key as AdvancedBuffKey);
+    } else {
+      if (tat < cost) {
+        onShowToast('탓(Tat)이 부족합니다!');
+        return;
+      }
+      buyBuff(selectedOption.key as BuffKey);
     }
-    buyBuff(selectedOption.key);
     onShowToast('영구 버프 구매 완료!');
   };
+
+  const isNamTatUnlocked = maxStage >= 100 || namTat > 0;
 
   return (
     <div className="modal-overlay" style={{ zIndex: 2000 }}>
       <div className="modal-content rebirth-modal-split">
         <button className="close-btn" onClick={onClose}>X</button>
         <h2 className="rebirth-title">탓 상점</h2>
-        <div className="tat-balance">보유 탓(Tat): <span>{tat.toLocaleString()}</span></div>
+        
+        <div className="rebirth-tabs">
+          <button className={`rebirth-tab-btn ${activeTab === 'tat' ? 'active' : ''}`} onClick={() => { setActiveTab('tat'); setSelectedBuffId('startPoongLevel'); }}>기본 탓 상점</button>
+          {isNamTatUnlocked && (
+            <button className={`rebirth-tab-btn ${activeTab === 'namTat' ? 'active' : ''}`} onClick={() => { setActiveTab('namTat'); setSelectedBuffId('namTatGachaDiscountLevel'); }}>심화 남탓 상점</button>
+          )}
+        </div>
+
+        <div className="tat-balance">
+          {activeTab === 'tat' ? `보유 탓(Tat): ` : `보유 남탓(Nam-Tat): `}
+          <span style={{ color: activeTab === 'namTat' ? '#e74c3c' : '#f1c40f' }}>
+            {activeTab === 'tat' ? tat.toLocaleString() : namTat.toLocaleString()}
+          </span>
+        </div>
 
         <div className="rebirth-body-split">
           {/* 좌측 그리드 */}
           <div className="buff-grid-compact">
-            {buffOptions.map(opt => {
-              const lvl = permanentBuffs[opt.key] || 0;
+            {currentOptions.map(opt => {
+              const lvl = activeTab === 'namTat' 
+                ? advancedBuffs[opt.key as AdvancedBuffKey] || 0
+                : permanentBuffs[opt.key as BuffKey] || 0;
               const isSelected = selectedBuffId === opt.id;
               return (
                 <div
@@ -185,9 +270,13 @@ export function RebirthModal({ onClose, onShowToast }: Props) {
             <button
               className="buy-btn-large"
               onClick={handleBuy}
-              disabled={tat < cost || cost === Infinity}
+              disabled={
+                (activeTab === 'tat' && tat < cost) || 
+                (activeTab === 'namTat' && namTat < cost) || 
+                cost === Infinity
+              }
             >
-              {cost === Infinity ? '최대 레벨 도달' : `성장 (${cost.toLocaleString()} 탓)`}
+              {cost === Infinity ? '최대 레벨 도달' : `성장 (${cost.toLocaleString()} ${activeTab === 'tat' ? '탓' : '남탓'})`}
             </button>
           </div>
         </div>

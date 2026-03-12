@@ -204,6 +204,8 @@ function App() {
     const app = new PIXI.Application();
     appRef.current = app;
 
+    let handleResize: () => void;
+
     const initPixi = async () => {
       const w = pixiContainer.current?.clientWidth || window.innerWidth;
       const h = pixiContainer.current?.clientHeight || window.innerHeight;
@@ -219,6 +221,7 @@ function App() {
           antialias: true,
         });
         app.stage.sortableChildren = true;
+        app.stage.eventMode = 'none'; // 최적화: 클릭 이벤트 추적 비활성화
 
         if (isCancelled) {
           app.destroy(true, { children: true, texture: true });
@@ -287,7 +290,7 @@ function App() {
           });
         });
 
-        const handleResize = () => {
+        handleResize = () => {
           if (app && pixiContainer.current) {
             const nw = pixiContainer.current.clientWidth;
             const nh = pixiContainer.current.clientHeight;
@@ -307,6 +310,9 @@ function App() {
     return () => {
       isCancelled = true;
       setPixiReady(false);
+      if (handleResize) {
+        window.removeEventListener('resize', handleResize);
+      }
       if (appRef.current) {
         appRef.current.destroy(true, { children: true, texture: true });
         appRef.current = null;
@@ -319,8 +325,12 @@ function App() {
     const app = appRef.current;
     if (!pixiReady || !app || !app.stage) return;
 
-    // 기존 캐릭터 초기화
-    app.stage.removeChildren();
+    // 기존 캐릭터 초기화 및 메모리 누수 방지
+    while (app.stage.children.length > 0) {
+      const child = app.stage.children[0];
+      app.stage.removeChild(child);
+      child.destroy({ children: true });
+    }
     charEntitiesRef.current = [];
 
     const currentOwned = useGameStore.getState().ownedCharacters;
