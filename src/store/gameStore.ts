@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { BaseDirectory, readTextFile, writeTextFile, exists, mkdir } from '@tauri-apps/plugin-fs';
 import { CHARACTER_DATA } from '../data/characters';
+import { submitScore } from '../utils/leaderboardApi';
 
 export interface Stats {
   vocal: number;
@@ -16,6 +17,7 @@ export interface OwnedCharacter {
   stats: Stats;
   caps: Stats;
   permanentBonus: Stats; // 사장 스킬로 얻은 영구 보너스
+  isLocked?: boolean; // 캐릭터 잠금 (일괄 배분/돌파 제외용)
 }
 
 export interface PermanentBuffs {
@@ -29,16 +31,39 @@ export interface PermanentBuffs {
   vipGachaLevel: number;       // VIP 멤버십 (확률 증가)
   enemyHpNerfLevel: number;    // 보스 체력 너프
   enemyAtkNerfLevel: number;   // 보스 공격력 너프
+  oshiBoostLevel: number;      // 최애 지정 등급업 레벨 (1: R가능, 2: SR가능)
+}
+
+export interface TowerCharacterSnapshot {
+  id: string;
+  name: string;
+  tier: string;
+  maxHp: number;
+  atk: number;
+  aspd: number;
+  burstMult: number;
+  burstChance: number;
+  savedAt: number; // 저장된 시점
+}
+
+export interface TowerArtifact {
+  id: string; // 'mic', 'lightstick', 'playbutton', 'blacklist'
+  level: number;
+  maxLevel: number;
 }
 
 interface GameState {
   poong: number;
   tat: number; // 환생 재화 '탓'
+  musicalNotes: number; // 황금 디스크 방 재화 '음표'
+  maxDiskDamage: number; // 황금 디스크 방 최고 기록
+  diskBuffs: Stats; // 황금 디스크 방 스탯별 버프 레벨
+
   permanentBuffs: PermanentBuffs;
   ownedCharacters: Record<string, OwnedCharacter>;
   activeRoster: string[]; // 현재 화면에 출근한 캐릭터 ID 목록 (최대 10명)
   totalTps: number;
-  
+
   // 가차 시스템 상태
   gachaLevel: number;
   totalRolls: number;
@@ -46,6 +71,13 @@ interface GameState {
   // 전투 시스템 상태
   combatParty: string[]; // 방어전 참여 멤버 (최대 4명)
   currentStage: number;
+
+  // 최강자의 탑 상태
+  towerFloor: number;
+  towerFragments: number;
+  towerSlots: (TowerCharacterSnapshot | null)[]; // 4개 슬롯
+  towerSlotLevels: [number, number, number, number]; // 각 슬롯의 오버클럭 레벨
+  towerArtifacts: TowerArtifact[];
 
   // 스킬 시스템 상태
   bossSkillUnlocked: boolean;
@@ -56,21 +88,26 @@ interface GameState {
   oshiSkillUnlocked: boolean;
   oshiLinkedCharId: string | null;
 
+  nickname: string | null; // 리더보드용 닉네임
+
   // Actions
+  setNickname: (name: string) => void;
   addPoong: (amount: number) => void;
   unlockCharacter: (id: string) => void;
   investStat: (charId: string, statType: keyof Stats) => void;
   autoDistributeSingleStats: (charId: string) => void;
+  resetCharacterStats: (charId: string) => void; // 스탯 초기화 (환급)
   autoDistributeAllStats: () => void; // 일괄 배분
   doBreakthrough: (charId: string) => void; // 한계 돌파
   autoBreakthroughAll: () => void; // 일괄 돌파
   toggleRoster: (charId: string) => void; // 출근/퇴근 토글
+  toggleLock: (charId: string) => void; // 캐릭터 잠금 토글
   setCombatParty: (party: string[]) => void; // 파티 설정
   nextStage: () => void;
   calculateTps: () => void;
   gameTick: () => void;
   pullGacha: (times: number | 'max') => string[];
-  
+
   // 스킬 Actions
   unlockBossSkill: () => void;
   useBossSkill: (charId: string) => void;
@@ -78,10 +115,20 @@ interface GameState {
   linkCeoSkill: (charId: string | null) => void;
   unlockOshiSkill: () => void;
   linkOshiSkill: (charId: string | null) => void;
-  
+
   // 환생 Actions
   doRebirth: () => void;
   buyBuff: (buffName: keyof PermanentBuffs) => void;
+
+  // 디스크 방 Actions
+  finishGoldenDisk: (totalDamage: number) => void;
+  upgradeDiskBuff: (statType: keyof Stats) => void;
+
+  // 탑 Actions
+  saveToTowerSlot: (slotIndex: number, charId: string) => void;
+  upgradeTowerSlot: (slotIndex: number) => void;
+  upgradeTowerArtifact: (artifactId: string) => void;
+  finishTowerFloor: (isWin: boolean) => void;
 
   // 세이브/로드 Actions
   initGame: () => Promise<void>;
@@ -102,10 +149,14 @@ const getStartingPoints = (tier: string): number => {
 // 등급별 스탯 효율 배율 (최종 뻥튀기용)
 export const getTierMultiplier = (charId: string): number => {
   const state = useGameStore.getState();
-  if (state.oshiLinkedCharId === charId) return 4.5; // Oshi is between R(3) and SR(6)
-
   const charInfo = CHARACTER_DATA.find(c => c.id === charId);
   if (!charInfo) return 1.0;
+
+  if (state.oshiLinkedCharId === charId) {
+    if (charInfo.tier === 'SR') return 8.0;
+    return 4.5; // Oshi is between R(3) and SR(6), unless SR which is 8.0
+  }
+
   switch (charInfo.tier) {
     case 'SR': return 6.0;
     case 'R': return 3.0;
@@ -116,10 +167,14 @@ export const getTierMultiplier = (charId: string): number => {
 
 export const getHpMultiplier = (charId: string): number => {
   const state = useGameStore.getState();
-  if (state.oshiLinkedCharId === charId) return 1.75; // Oshi is between R(1.5) and SR(2.0)
-
   const charInfo = CHARACTER_DATA.find(c => c.id === charId);
   if (!charInfo) return 1.0;
+
+  if (state.oshiLinkedCharId === charId) {
+    if (charInfo.tier === 'SR') return 3.0;
+    return 1.75; // Oshi is between R(1.5) and SR(2.0), unless SR which is 3.0
+  }
+
   switch (charInfo.tier) {
     case 'SR': return 2.0;
     case 'R': return 1.5;
@@ -140,15 +195,16 @@ export const getEffectiveStats = (state: GameState, charId: string): Stats => {
     stats.sense += ceoBoost;
     stats.charm += ceoBoost;
   }
-  
+
   // 환생 버프 곱연산 적용을 제외한 "순수 스탯 합산치"만 넘깁니다. 
   // 등급별 배율(TierMultiplier)은 여기서 바로 곱하지 않고, TPS나 전투 데미지를 계산하는 최상위(최종) 단계에서만 곱해야 체급 차이가 부각됩니다.
+  // 디스크 버프는 여기서 %로 스탯 체급 자체를 뻥튀기합니다 (1레벨당 10%).
   return {
-    vocal: stats.vocal,
-    rap: stats.rap,
-    dance: stats.dance,
-    sense: stats.sense,
-    charm: stats.charm,
+    vocal: Math.floor(stats.vocal * (1 + state.diskBuffs.vocal * 0.10)),
+    rap: Math.floor(stats.rap * (1 + state.diskBuffs.rap * 0.10)),
+    dance: Math.floor(stats.dance * (1 + state.diskBuffs.dance * 0.10)),
+    sense: Math.floor(stats.sense * (1 + state.diskBuffs.sense * 0.10)),
+    charm: Math.floor(stats.charm * (1 + state.diskBuffs.charm * 0.10)),
   };
 };
 
@@ -157,21 +213,21 @@ const calcCharTps = (stats: Stats, buffs: PermanentBuffs, charId: string) => {
   let baseVocal = 0;
   if (stats.vocal <= 100) baseVocal = stats.vocal * 10;
   else baseVocal = 1000 + (Math.log10(stats.vocal - 99) * 200);
-  
+
   const base = Math.max(1, baseVocal);
   // Revamped Rule Breaker (+5% hardcap per level)
   const critChance = Math.min((stats.sense * 1) / 100, 0.5 + (buffs.ruleBreakerLevel * 0.05));
   // Revamped Rule Breaker (+0.5x critical multiplier per level)
-  const critMult = 1.5 + (Math.log10(stats.rap + 10) * 0.3) + (buffs.ruleBreakerLevel * 0.5); 
-  const finalMult = 1.0 + (stats.charm * 0.03); 
+  const critMult = 1.5 + (Math.log10(stats.rap + 10) * 0.3) + (buffs.ruleBreakerLevel * 0.5);
+  const finalMult = 1.0 + (stats.charm * 0.03);
   const interval = 1 / (0.8 + Math.log10(stats.dance + 10) * 0.2);
-  
+
   const expectedValuePerTick = (base * (1 - critChance)) + (base * critMult * critChance);
   const tps = (expectedValuePerTick * finalMult) / interval;
-  
+
   const rebirthMult = 1.0 + (buffs.tpsMultiplierLevel * 2.0); // 1레벨당 +200%
   const tierMult = getTierMultiplier(charId);
-  
+
   return tps * rebirthMult * tierMult;
 };
 
@@ -197,6 +253,16 @@ const _starter = getRandomStarter();
 export const useGameStore = create<GameState>((set, get) => ({
   poong: 10000, // 초기 자본금
   tat: 0,
+  musicalNotes: 0,
+  maxDiskDamage: 0,
+  diskBuffs: { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 },
+  
+  towerFloor: 1,
+  towerFragments: 0,
+  towerSlots: [null, null, null, null],
+  towerSlotLevels: [1, 1, 1, 1],
+  towerArtifacts: [],
+
   permanentBuffs: {
     startPoongLevel: 0,
     tpsMultiplierLevel: 0,
@@ -207,7 +273,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     gachaDiscountLevel: 0,
     vipGachaLevel: 0,
     enemyHpNerfLevel: 0,
-    enemyAtkNerfLevel: 0
+    enemyAtkNerfLevel: 0,
+    oshiBoostLevel: 0
   },
   ownedCharacters: {
     [_starter.id]: {
@@ -231,7 +298,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   ceoLinkedStat: null,
   oshiSkillUnlocked: false,
   oshiLinkedCharId: null,
+  nickname: null,
 
+  setNickname: (name) => set({ nickname: name }),
   addPoong: (amount) => set((state) => ({ poong: state.poong + amount })),
 
   unlockBossSkill: () => set((state) => {
@@ -254,7 +323,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const boostAmount = 30 + (state.permanentBuffs.bossSkillBoostLevel * 30);
 
     return {
-      bossSkillCooldownEnd: now + 300 * 1000, 
+      bossSkillCooldownEnd: now + 300 * 1000,
       ownedCharacters: {
         ...state.ownedCharacters,
         [charId]: {
@@ -304,8 +373,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       return { oshiLinkedCharId: null };
     }
     const charData = CHARACTER_DATA.find(c => c.id === charId);
-    if (!charData || (charData.tier !== 'C' && charData.tier !== 'U')) return state;
-    
+    if (!charData) return state;
+
+    const allowedTiers = ['C', 'U'];
+    if (state.permanentBuffs.oshiBoostLevel >= 1) allowedTiers.push('R');
+    if (state.permanentBuffs.oshiBoostLevel >= 2) allowedTiers.push('SR');
+
+    if (!allowedTiers.includes(charData.tier)) return state;
+
     return { oshiLinkedCharId: charId };
   }),
 
@@ -314,6 +389,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     if (state.currentStage < 30) return;
 
     const earnedTat = (state.currentStage - 30) * 10;
+
+    // 비동기로 리더보드에 점수 제출 (닉네임이 있을 경우에만)
+    if (state.nickname) {
+      submitScore(state.nickname, state.currentStage).catch(console.error);
+    }
 
     // 랜덤 초기 캐릭터 선택
     const starter = getRandomStarter();
@@ -360,28 +440,32 @@ export const useGameStore = create<GameState>((set, get) => ({
         cost = Math.floor(30 * Math.pow(buffs.tpsMultiplierLevel + 1, 1.5));
         break;
       case 'hardTrainingLevel':
-        cost = Math.floor(30 * Math.pow(buffs.hardTrainingLevel + 1, 1.5)); 
+        cost = Math.floor(30 * Math.pow(buffs.hardTrainingLevel + 1, 1.5));
         break;
       case 'ruleBreakerLevel':
-        cost = Math.floor(50 * Math.pow(buffs.ruleBreakerLevel + 1, 1.5)); 
+        cost = Math.floor(50 * Math.pow(buffs.ruleBreakerLevel + 1, 1.5));
         break;
       case 'bossSkillBoostLevel':
-        cost = Math.floor(80 * Math.pow(buffs.bossSkillBoostLevel + 1, 1.5)); 
+        cost = Math.floor(80 * Math.pow(buffs.bossSkillBoostLevel + 1, 1.5));
         break;
       case 'ceoSkillBoostLevel':
-        cost = Math.floor(100 * Math.pow(buffs.ceoSkillBoostLevel + 1, 1.5)); 
+        cost = Math.floor(100 * Math.pow(buffs.ceoSkillBoostLevel + 1, 1.5));
         break;
       case 'gachaDiscountLevel':
-        cost = Math.floor(80 * Math.pow(buffs.gachaDiscountLevel + 1, 1.5)); 
+        cost = Math.floor(80 * Math.pow(buffs.gachaDiscountLevel + 1, 1.5));
         break;
       case 'vipGachaLevel':
-        cost = Math.floor(150 * Math.pow(buffs.vipGachaLevel + 1, 1.5)); 
+        cost = Math.floor(150 * Math.pow(buffs.vipGachaLevel + 1, 1.5));
         break;
       case 'enemyHpNerfLevel':
         cost = Math.floor(100 * Math.pow((buffs.enemyHpNerfLevel || 0) + 1, 1.5));
         break;
       case 'enemyAtkNerfLevel':
         cost = Math.floor(100 * Math.pow((buffs.enemyAtkNerfLevel || 0) + 1, 1.5));
+        break;
+      case 'oshiBoostLevel':
+        if (buffs.oshiBoostLevel >= 2) return state; // 최대 2레벨
+        cost = 150 * (buffs.oshiBoostLevel + 1); // 1렙 150, 2렙 300
         break;
     }
 
@@ -396,6 +480,147 @@ export const useGameStore = create<GameState>((set, get) => ({
       tat: state.tat - cost,
       poong: state.poong + bonusPoong,
       permanentBuffs: buffs
+    };
+  }),
+
+  finishGoldenDisk: (totalDamage) => set((state) => {
+    if (totalDamage > state.maxDiskDamage) {
+      const diff = totalDamage - state.maxDiskDamage;
+      const notesEarned = Math.floor(diff / 10000);
+      return {
+        maxDiskDamage: totalDamage,
+        musicalNotes: state.musicalNotes + notesEarned
+      };
+    }
+    return state;
+  }),
+
+  upgradeDiskBuff: (statType) => {
+    set((state) => {
+      const currentLevel = state.diskBuffs[statType];
+      const cost = Math.floor(100 * Math.pow(1.5, currentLevel));
+      
+      if (state.musicalNotes >= cost) {
+        return {
+          musicalNotes: state.musicalNotes - cost,
+          diskBuffs: {
+            ...state.diskBuffs,
+            [statType]: currentLevel + 1
+          }
+        };
+      }
+      return state;
+    });
+    get().calculateTps();
+  },
+
+  // 탑 Actions
+  saveToTowerSlot: (slotIndex, charId) => set((state) => {
+    const charStore = state.ownedCharacters[charId];
+    const charInfo = CHARACTER_DATA.find(c => c.id === charId);
+    if (!charStore || !charInfo) return state;
+
+    const s = getEffectiveStats(state, charId);
+    const rebirthMult = 1.0 + (state.permanentBuffs.hardTrainingLevel * 1.5);
+    const tierMult = getTierMultiplier(charId);
+    const hpMult = getHpMultiplier(charId);
+
+    let baseAtk = 0;
+    if (s.vocal <= 100) baseAtk = s.vocal * 10;
+    else baseAtk = 1000 + (Math.log10(s.vocal - 99) * 200);
+
+    const snapshot: TowerCharacterSnapshot = {
+      id: charId,
+      name: charInfo.name,
+      tier: charInfo.tier,
+      maxHp: Math.floor((200 + s.charm * 80) * rebirthMult * hpMult),
+      atk: Math.floor(baseAtk * rebirthMult * tierMult),
+      aspd: 0.8 + (Math.log10(s.dance + 10) * 0.2),
+      burstMult: 1.5 + (Math.log10(s.rap + 10) * 0.3) + (state.permanentBuffs.ruleBreakerLevel * 0.5),
+      burstChance: Math.min((s.sense * 1) / 100, 0.5 + (state.permanentBuffs.ruleBreakerLevel * 0.05)),
+      savedAt: Date.now()
+    };
+
+    const newSlots = [...state.towerSlots];
+    newSlots[slotIndex] = snapshot;
+    return { towerSlots: newSlots };
+  }),
+
+  upgradeTowerSlot: (slotIndex) => set((state) => {
+    const currentLevel = state.towerSlotLevels[slotIndex];
+    const cost = Math.floor(200 * Math.pow(1.3, currentLevel - 1));
+    if (state.towerFragments >= cost) {
+      const newLevels = [...state.towerSlotLevels] as [number, number, number, number];
+      newLevels[slotIndex] = currentLevel + 1;
+      return {
+        towerFragments: state.towerFragments - cost,
+        towerSlotLevels: newLevels
+      };
+    }
+    return state;
+  }),
+
+  upgradeTowerArtifact: (artifactId) => set((state) => {
+    const artifact = state.towerArtifacts.find(a => a.id === artifactId);
+    if (!artifact || artifact.level >= artifact.maxLevel) return state;
+
+    const cost = Math.floor(100 * Math.pow(1.5, artifact.level - 1));
+    if (state.towerFragments >= cost) {
+      return {
+        towerFragments: state.towerFragments - cost,
+        towerArtifacts: state.towerArtifacts.map(a => 
+          a.id === artifactId ? { ...a, level: a.level + 1 } : a
+        )
+      };
+    }
+    return state;
+  }),
+
+  finishTowerFloor: (isWin) => set((state) => {
+    if (!isWin) return state;
+
+    const floor = state.towerFloor;
+    const isBoss = floor % 5 === 0;
+    
+    // 파편 획득
+    const baseFragments = Math.floor(10 * Math.pow(1.15, floor - 1));
+    const fragmentsGained = isBoss ? baseFragments * 5 : baseFragments;
+
+    // 유물 획득
+    let newArtifacts = [...state.towerArtifacts];
+    if (isBoss) {
+      const artifactPool = [];
+      if (floor >= 5) artifactPool.push('mic');
+      if (floor >= 10) artifactPool.push('lightstick');
+      if (floor >= 15) artifactPool.push('playbutton');
+      if (floor >= 20) artifactPool.push('blacklist');
+      
+      if (artifactPool.length > 0) {
+        let selectedId = '';
+        if (floor === 5) selectedId = 'mic';
+        else if (floor === 10) selectedId = 'lightstick';
+        else if (floor === 15) selectedId = 'playbutton';
+        else if (floor === 20) selectedId = 'blacklist';
+        else {
+          // 25층 이상 랜덤
+          selectedId = artifactPool[Math.floor(Math.random() * artifactPool.length)];
+        }
+
+        const existing = newArtifacts.find(a => a.id === selectedId);
+        if (existing) {
+          newArtifacts = newArtifacts.map(a => 
+            a.id === selectedId ? { ...a, maxLevel: a.maxLevel + 5 } : a
+          );
+        } else {
+          newArtifacts.push({ id: selectedId, level: 1, maxLevel: 10 });
+        }
+      }
+    }
+
+    return {
+      towerFloor: floor + 1,
+      towerFragments: state.towerFragments + fragmentsGained,
+      towerArtifacts: newArtifacts
     };
   }),
 
@@ -435,12 +660,12 @@ export const useGameStore = create<GameState>((set, get) => ({
           id,
           points: startPts,
           stats: { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 },
-          caps: { 
-            vocal: charData.baseCap, 
-            rap: charData.baseCap, 
-            dance: charData.baseCap, 
-            sense: charData.baseCap, 
-            charm: charData.baseCap 
+          caps: {
+            vocal: charData.baseCap,
+            rap: charData.baseCap,
+            dance: charData.baseCap,
+            sense: charData.baseCap,
+            charm: charData.baseCap
           },
           permanentBonus: { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 }
         }
@@ -460,6 +685,17 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (state.activeRoster.length >= 10) return state;
       return { activeRoster: [...state.activeRoster, charId] };
     }
+  }),
+
+  toggleLock: (charId) => set((state) => {
+    const char = state.ownedCharacters[charId];
+    if (!char) return state;
+    return {
+      ownedCharacters: {
+        ...state.ownedCharacters,
+        [charId]: { ...char, isLocked: !char.isLocked }
+      }
+    };
   }),
 
   setCombatParty: (party) => set({ combatParty: party }),
@@ -531,6 +767,43 @@ export const useGameStore = create<GameState>((set, get) => ({
     get().calculateTps();
   },
 
+  resetCharacterStats: (charId) => {
+    set((state) => {
+      const char = state.ownedCharacters[charId];
+      if (!char) return state;
+
+      const statKeys: Array<keyof Stats> = ['vocal', 'rap', 'dance', 'sense', 'charm'];
+      let refundPoints = 0;
+      const newStats = { ...char.stats };
+      const newBonus = { ...char.permanentBonus };
+
+      statKeys.forEach(key => {
+        // 투자된 포인트 환급 (보너스로 오른 스탯도 환급에 포함하여 모두 0으로 만듦)
+        // 최대치(caps)는 유지되므로, 환급받은 포인트를 다시 투자할 수 있습니다.
+        refundPoints += newStats[key];
+        newStats[key] = 0;
+
+        // 빕어의 숙제로 얻은 보너스 '스탯'도 제거 (최대치는 놔둠)
+        newBonus[key] = 0;
+      });
+
+      if (refundPoints <= 0) return state;
+
+      return {
+        ownedCharacters: {
+          ...state.ownedCharacters,
+          [charId]: {
+            ...char,
+            points: char.points + refundPoints,
+            stats: newStats,
+            permanentBonus: newBonus // 스탯 보너스는 초기화
+          }
+        }
+      };
+    });
+    get().calculateTps();
+  },
+
   autoDistributeAllStats: () => {
     set((state) => {
       let changed = false;
@@ -539,6 +812,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       Object.keys(newOwned).forEach(charId => {
         const char = { ...newOwned[charId] };
+        if (char.isLocked) return; // 잠금 캐릭터는 스킵
+
         const newStats = { ...char.stats };
         let pts = char.points;
         let charChanged = false;
@@ -592,6 +867,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       Object.keys(newOwned).forEach(charId => {
         const char = { ...newOwned[charId] };
+        if (char.isLocked) return; // 잠금 캐릭터는 스킵
+
         const charData = CHARACTER_DATA.find(c => c.id === charId);
         if (!charData) return;
 
@@ -690,7 +967,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get();
     // Revamped Gacha Discount: subtracts from totalRolls exponent instead of flat cost
     const rollDiscount = state.permanentBuffs.gachaDiscountLevel * 50;
-    
+
     let pullTimes = typeof times === 'number' ? times : 10000;
     if (pullTimes <= 0) return [];
 
@@ -700,20 +977,20 @@ export const useGameStore = create<GameState>((set, get) => ({
     const results: string[] = [];
 
     for (let i = 0; i < pullTimes; i++) {
-        // 적용된 할인만큼 지수 증가폭을 지연시킵니다 (최소 0 방어)
-        const discountedRolls = Math.max(0, currentRolls - rollDiscount);
-        const baseCost = 50 * Math.pow(1.0011, discountedRolls);
-        const singleCost = Math.max(10, Math.floor(baseCost)); 
+      // 적용된 할인만큼 지수 증가폭을 지연시킵니다 (최소 0 방어)
+      const discountedRolls = Math.max(0, currentRolls - rollDiscount);
+      const baseCost = 50 * Math.pow(1.0011, discountedRolls);
+      const singleCost = Math.max(10, Math.floor(baseCost));
 
-        if (currentPoong < singleCost) {
-            break; // 돈이 부족하면 즉시 중단 (times가 'max'일 때 자동 정지 역할)
-        }
+      if (currentPoong < singleCost) {
+        break; // 돈이 부족하면 즉시 중단 (times가 'max'일 때 자동 정지 역할)
+      }
 
-        currentPoong -= singleCost;
-        totalSpent += singleCost;
-        currentRolls++;
+      currentPoong -= singleCost;
+      totalSpent += singleCost;
+      currentRolls++;
       const currentLevel = calculateGachaLevel(currentRolls);
-      
+
       // 등급별 가중치 설정 (각 캐릭터 1명당 확률 %)
       const levelWeights: Record<number, Record<string, number>> = {
         1: { 'C': 8.0, 'U': 2.0, 'R': 0.0, 'SR': 0.0 },
@@ -725,7 +1002,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       };
 
       const currentWeights = { ...levelWeights[currentLevel] };
-      
+
       // VIP 멤버십 Revamp: SR 확률 고정 +1.0%p 증가 (레벨당 1%)
       const vipBonus = state.permanentBuffs.vipGachaLevel * 1.0;
       currentWeights['SR'] += vipBonus;
@@ -746,7 +1023,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       // 랜덤 선택
       let randomNum = Math.random() * totalWeight;
       let selectedId = pool[0].id;
-      
+
       for (const item of pool) {
         if (randomNum < item.weight) {
           selectedId = item.id;
@@ -754,7 +1031,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         }
         randomNum -= item.weight;
       }
-      
+
       results.push(selectedId);
       // 스토어의 unlockCharacter 호출하여 즉시 반영
       get().unlockCharacter(selectedId);
@@ -782,10 +1059,27 @@ export const useGameStore = create<GameState>((set, get) => ({
       if (hasSave) {
         const contents = await readTextFile('save.json', { baseDir: BaseDirectory.AppData });
         const savedState = JSON.parse(contents);
-        
+
         if (savedState.permanentBuffs) {
           savedState.permanentBuffs.enemyHpNerfLevel = savedState.permanentBuffs.enemyHpNerfLevel || 0;
           savedState.permanentBuffs.enemyAtkNerfLevel = savedState.permanentBuffs.enemyAtkNerfLevel || 0;
+          savedState.permanentBuffs.oshiBoostLevel = savedState.permanentBuffs.oshiBoostLevel || 0;
+        }
+
+        // 디스크 버프 기본값 복구 (이전 세이브 호환)
+        if (!savedState.diskBuffs) {
+          savedState.diskBuffs = { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 };
+          savedState.musicalNotes = 0;
+          savedState.maxDiskDamage = 0;
+        }
+
+        // 탑 시스템 기본값 복구 (이전 세이브 호환)
+        if (!savedState.towerFloor) {
+          savedState.towerFloor = 1;
+          savedState.towerFragments = 0;
+          savedState.towerSlots = [null, null, null, null];
+          savedState.towerSlotLevels = [1, 1, 1, 1];
+          savedState.towerArtifacts = [];
         }
 
         set({ ...savedState });
@@ -804,18 +1098,22 @@ export const useGameStore = create<GameState>((set, get) => ({
     try {
       const state = get();
       // 저장 대상에서 actions들은 제외하고 순수 데이터만 추출
-      const { 
-        poong, tat, permanentBuffs, ownedCharacters, activeRoster, 
-        gachaLevel, totalRolls, combatParty, currentStage, 
-        bossSkillUnlocked, bossSkillCooldownEnd, ceoSkillUnlocked, 
-        ceoLinkedCharId, ceoLinkedStat, oshiSkillUnlocked, oshiLinkedCharId
+      const {
+        poong, tat, musicalNotes, maxDiskDamage, diskBuffs, permanentBuffs, ownedCharacters, activeRoster,
+        gachaLevel, totalRolls, combatParty, currentStage,
+        bossSkillUnlocked, bossSkillCooldownEnd, ceoSkillUnlocked,
+        ceoLinkedCharId, ceoLinkedStat, oshiSkillUnlocked, oshiLinkedCharId,
+        nickname,
+        towerFloor, towerFragments, towerSlots, towerSlotLevels, towerArtifacts
       } = state;
-      
+
       const dataToSave = {
-        poong, tat, permanentBuffs, ownedCharacters, activeRoster, 
-        gachaLevel, totalRolls, combatParty, currentStage, 
-        bossSkillUnlocked, bossSkillCooldownEnd, ceoSkillUnlocked, 
-        ceoLinkedCharId, ceoLinkedStat, oshiSkillUnlocked, oshiLinkedCharId
+        poong, tat, musicalNotes, maxDiskDamage, diskBuffs, permanentBuffs, ownedCharacters, activeRoster,
+        gachaLevel, totalRolls, combatParty, currentStage,
+        bossSkillUnlocked, bossSkillCooldownEnd, ceoSkillUnlocked,
+        ceoLinkedCharId, ceoLinkedStat, oshiSkillUnlocked, oshiLinkedCharId,
+        nickname,
+        towerFloor, towerFragments, towerSlots, towerSlotLevels, towerArtifacts
       };
 
       await writeTextFile('save.json', JSON.stringify(dataToSave), { baseDir: BaseDirectory.AppData });
@@ -832,11 +1130,19 @@ export const useGameStore = create<GameState>((set, get) => ({
       const initialState = {
         poong: 10000, // 초기 자본금
         tat: 0,
+        musicalNotes: 0,
+        maxDiskDamage: 0,
+        diskBuffs: { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 },
+        towerFloor: 1,
+        towerFragments: 0,
+        towerSlots: [null, null, null, null],
+        towerSlotLevels: [1, 1, 1, 1] as [number, number, number, number],
+        towerArtifacts: [],
         permanentBuffs: {
           startPoongLevel: 0, tpsMultiplierLevel: 0, ruleBreakerLevel: 0,
           hardTrainingLevel: 0, bossSkillBoostLevel: 0, ceoSkillBoostLevel: 0,
           gachaDiscountLevel: 0, vipGachaLevel: 0,
-          enemyHpNerfLevel: 0, enemyAtkNerfLevel: 0
+          enemyHpNerfLevel: 0, enemyAtkNerfLevel: 0, oshiBoostLevel: 0
         },
         ownedCharacters: {
           [starter.id]: {
@@ -860,6 +1166,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         ceoLinkedStat: null,
         oshiSkillUnlocked: false,
         oshiLinkedCharId: null,
+        nickname: null,
       };
 
       set({ ...initialState });

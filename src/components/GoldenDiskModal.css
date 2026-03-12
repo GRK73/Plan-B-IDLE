@@ -1,0 +1,132 @@
+.disk-modal {
+  width: 700px;
+  max-width: 95%;
+  border: 3px solid #f1c40f;
+  box-shadow: 0 0 30px rgba(241, 196, 15, 0.4), inset 0 0 20px rgba(241, 196, 15, 0.2);
+  background: linear-gradient(135deg, #2c2c2c, #1a1a1a);
+  padding: 30px;
+}
+
+.disk-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 10px;
+  border-bottom: 2px solid #f1c40f;
+  padding-bottom: 15px;
+}
+
+.disk-header-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(241, 196, 15, 0.8));
+}
+
+.disk-modal-header h2 {
+  margin: 0;
+  color: #f1c40f;
+  font-size: 1.8rem;
+  text-shadow: 2px 2px 4px #000;
+}
+
+.disk-desc {
+  text-align: center;
+  color: #aaa;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.disk-currency-box {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #444;
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+/* 2열 그리드 레이아웃 */
+.disk-buffs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.disk-buff-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #555;
+  border-radius: 10px;
+  padding: 15px;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.disk-buff-item:hover {
+  transform: translateY(-2px);
+  border-color: #f1c40f;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.disk-buff-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.disk-buff-name {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.disk-buff-level {
+  font-size: 0.85rem;
+  color: #f1c40f;
+  background: rgba(241, 196, 15, 0.2);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.disk-buff-effect {
+  font-size: 0.95rem;
+  font-weight: bold;
+}
+
+.disk-upgrade-btn {
+  background: linear-gradient(45deg, #f39c12, #f1c40f);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 15px;
+  color: #222;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 100px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 10px rgba(241, 196, 15, 0.3);
+}
+
+.disk-upgrade-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 6px 15px rgba(241, 196, 15, 0.5);
+}
+
+.disk-upgrade-btn:disabled {
+  background: #444;
+  color: #888;
+  cursor: not-allowed;
+  box-shadow: none;
+  border: 1px solid #555;
+}

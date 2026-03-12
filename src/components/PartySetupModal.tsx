@@ -6,12 +6,12 @@ import './PartySetupModal.css';
 
 interface Props {
   onClose: () => void;
-  onStartCombat: () => void;
+  onStartCombat: (mode: 'normal' | 'disk') => void;
   onShowToast: (msg: string) => void;
 }
 
 export function PartySetupModal({ onClose, onStartCombat, onShowToast }: Props) {
-  const { ownedCharacters, combatParty, setCombatParty } = useGameStore();
+  const { ownedCharacters, combatParty, setCombatParty, currentStage } = useGameStore();
   
   // 슬롯 기반(4칸 고정) 파티 상태
   const [localParty, setLocalParty] = useState<(string | null)[]>(() => {
@@ -23,6 +23,7 @@ export function PartySetupModal({ onClose, onStartCombat, onShowToast }: Props) 
   });
 
   const [focusedCharId, setFocusedCharId] = useState<string | null>(null);
+  const [combatMode, setCombatMode] = useState<'normal' | 'disk'>('normal');
 
   const handleRosterClick = (id: string) => {
     if (focusedCharId === id) {
@@ -57,28 +58,43 @@ export function PartySetupModal({ onClose, onStartCombat, onShowToast }: Props) 
       }
     }
   };
-
-  const handleConfirm = () => {
-    const finalParty = localParty.filter(Boolean) as string[];
-    if (finalParty.length === 0) {
-      onShowToast('최소 1명 이상의 멤버를 편성해야 합니다.');
-      return;
-    }
+const handleClose = () => {
+  // 창을 닫을 때도 현재 배치 상태를 전역 스토어에 저장
+  const finalParty = localParty.map(id => id || "");
+  if (finalParty.some(id => id !== "")) {
     setCombatParty(finalParty);
-    onStartCombat();
-  };
+  }
+  onClose();
+};
 
-  const ownedList = CHARACTER_DATA.filter(char => !!ownedCharacters[char.id]);
+const handleConfirm = () => {
+  const finalParty = localParty.map(id => id || "");
+  if (!finalParty.some(id => id !== "")) {
+    onShowToast('최소 1명은 배치해야 합니다.');
+    return;
+  }
+  setCombatParty(finalParty);
+  onStartCombat(combatMode);
+};
+const ownedList = CHARACTER_DATA.filter(char => !!ownedCharacters[char.id]);
 
-  return (
-    <div className="modal-overlay">
-      <div className="modal-content party-setup-modal">
-        <button className="close-btn" onClick={onClose}>X</button>
-
+return (
+  <div className="modal-overlay">
+    <div className="modal-content party-setup-modal">
+      <button className="close-btn" onClick={handleClose}>X</button>
         <div className="party-setup-layout">
           {/* 좌측: 현재 선택된 파티 (2x2) */}
           <div className="party-setup-left">
-            <h3>배치도</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '15px' }}>
+              <h3 style={{ margin: 0 }}>배치도</h3>
+              <div className="info-tooltip-wrapper" style={{ marginBottom: '2px' }}>
+                <span className="info-icon" style={{ fontSize: '1rem' }}>❓</span>
+                <div className="info-tooltip" style={{ top: '100%', left: '0', transform: 'none', marginLeft: '20px', marginTop: '10px' }}>
+                  보스의 공격은 전열(앞쪽 2명)에 집중될 확률이 훨씬 높습니다. (약 3배)<br/>
+                  체력(매력)이 높은 사원을 전열에 배치하여 후열의 딜러를 보호하세요!
+                </div>
+              </div>
+            </div>
             <div className="selected-party-grid">
               {[0, 1, 2, 3].map(index => {
                 const charId = localParty[index];
@@ -140,8 +156,30 @@ export function PartySetupModal({ onClose, onStartCombat, onShowToast }: Props) 
             </div>
             
             <div className="party-setup-actions">
+              <div className="combat-mode-toggle" style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                <button 
+                  className={`mode-btn normal ${combatMode === 'normal' ? 'active' : ''}`}
+                  onClick={() => setCombatMode('normal')}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: combatMode === 'normal' ? '2px solid #e74c3c' : '2px solid #555', background: combatMode === 'normal' ? 'rgba(231, 76, 60, 0.2)' : '#333', color: 'white', cursor: 'pointer', fontWeight: 'bold' }}
+                >
+                  ⚔️ 일반 스테이지
+                </button>
+                <button 
+                  className={`mode-btn disk ${combatMode === 'disk' ? 'active' : ''}`}
+                  onClick={() => {
+                    if (currentStage < 60) {
+                      onShowToast('황금 디스크의 방은 스테이지 60 이상부터 진입 가능합니다.');
+                    } else {
+                      setCombatMode('disk');
+                    }
+                  }}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: combatMode === 'disk' ? '2px solid #f1c40f' : '2px solid #555', background: combatMode === 'disk' ? 'rgba(241, 196, 15, 0.2)' : '#333', color: currentStage >= 60 ? 'white' : '#888', cursor: currentStage >= 60 ? 'pointer' : 'not-allowed', fontWeight: 'bold' }}
+                >
+                  {currentStage >= 60 ? '💿 디스크 방' : '🔒 디스크 방 (St.60)'}
+                </button>
+              </div>
               <button className="start-combat-btn" onClick={handleConfirm}>
-                전투 시작!
+                {combatMode === 'normal' ? '전투 시작!' : '기록 측정 시작 (60초)'}
               </button>
             </div>
           </div>

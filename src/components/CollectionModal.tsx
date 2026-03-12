@@ -45,19 +45,32 @@ export function CollectionModal({ onClose, onSelectChar, onShowToast }: Props) {
                 <div className="collection-card-name">{isOwned ? char.name : '???'}</div>
                 
                 {isOwned && (
-                  <button 
-                    className={`roster-toggle-btn ${isWorking ? 'on' : 'off'}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (!isWorking && activeRoster.length >= 10) {
-                        onShowToast("최대 10명까지만 출근할 수 있습니다.");
-                        return;
-                      }
-                      toggleRoster(char.id);
-                    }}
-                  >
-                    {isWorking ? '퇴근' : '출근'}
-                  </button>
+                  <div className="card-actions" style={{ display: 'flex', gap: '5px', marginTop: '8px' }}>
+                    <button 
+                      className={`roster-toggle-btn ${isWorking ? 'on' : 'off'}`}
+                      style={{ flex: 1 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!isWorking && activeRoster.length >= 10) {
+                          onShowToast("최대 10명까지만 출근할 수 있습니다.");
+                          return;
+                        }
+                        toggleRoster(char.id);
+                      }}
+                    >
+                      {isWorking ? '퇴근' : '출근'}
+                    </button>
+                    <button
+                      className="lock-toggle-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        useGameStore.getState().toggleLock(char.id);
+                      }}
+                      title="일괄 배분/돌파 잠금"
+                    >
+                      {owned.isLocked ? '🔒' : '🔓'}
+                    </button>
+                  </div>
                 )}
               </div>
             );

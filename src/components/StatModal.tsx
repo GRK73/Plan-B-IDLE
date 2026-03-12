@@ -7,14 +7,16 @@ import './StatModal.css';
 interface Props {
   charId: string;
   onClose: () => void;
+  onShowToast: (msg: string) => void;
+  onOpenConfirm: (config: { message: string; onConfirm: () => void }) => void;
 }
 
 const STAT_KEYS: Array<keyof Stats> = ['vocal', 'rap', 'dance', 'sense', 'charm'];
 const STAT_NAMES: Record<keyof Stats, string> = {
-  vocal: '보컬 (V)', 
-  rap: '랩 (R)', 
-  dance: '댄스 (D)', 
-  sense: '방송감 (S)', 
+  vocal: '보컬 (V)',
+  rap: '랩 (R)',
+  dance: '댄스 (D)',
+  sense: '방송감 (S)',
   charm: '매력 (C)'
 };
 
@@ -26,12 +28,11 @@ const STAT_TOOLTIPS: Record<keyof Stats, { prod: string, combat: string }> = {
   charm: { prod: '최종 생산량 뻥튀기', combat: '전투 최대 체력 (HP)' }
 };
 
-export function StatModal({ charId, onClose }: Props) {
-  const { ownedCharacters, investStat, autoDistributeSingleStats, doBreakthrough, calculateTps } = useGameStore();
-  
+export function StatModal({ charId, onClose, onShowToast, onOpenConfirm }: Props) {
+  const { ownedCharacters, investStat, autoDistributeSingleStats, resetCharacterStats, doBreakthrough, calculateTps } = useGameStore();
+
   const charState = ownedCharacters[charId];
   const charInfo = CHARACTER_DATA.find(c => c.id === charId);
-
   // 카드 확대 상태
   const [isCardExpanded, setIsCardExpanded] = useState(false);
 
@@ -39,7 +40,7 @@ export function StatModal({ charId, onClose }: Props) {
   const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startHoldAction = (action: () => void) => {
-    action(); 
+    action();
     holdIntervalRef.current = setInterval(() => {
       action();
     }, 100); // 0.1초마다 실행
@@ -64,7 +65,7 @@ export function StatModal({ charId, onClose }: Props) {
   const radius = 75;
 
   const getPoint = (index: number, ratio: number) => {
-    const angle = (Math.PI * 2 * index) / 5 - Math.PI / 2; 
+    const angle = (Math.PI * 2 * index) / 5 - Math.PI / 2;
     const x = center + radius * ratio * Math.cos(angle);
     const y = center + radius * ratio * Math.sin(angle);
     return `${x},${y}`;
@@ -117,20 +118,20 @@ export function StatModal({ charId, onClose }: Props) {
   else baseAtk = 1000 + (Math.log10(s.vocal - 99) * 200);
 
   const cAtk = Math.floor(baseAtk * rebirthMult * tierMult);
-  const cCritChance = Math.min((s.sense * 1), 50 + (useGameStore.getState().permanentBuffs.ruleBreakerLevel));
-  const cCritMult = (1.5 + Math.log10(s.rap + 10) * 0.3) * 100;
+  const cCritChance = Math.min((s.sense * 1), 50 + (useGameStore.getState().permanentBuffs.ruleBreakerLevel * 5));
+  const cCritMult = (1.5 + Math.log10(s.rap + 10) * 0.3 + (useGameStore.getState().permanentBuffs.ruleBreakerLevel * 0.5)) * 100;
   const cAspd = 0.8 + (Math.log10(s.dance + 10) * 0.2);
-  const cHp = Math.floor((200 + s.charm * 30 + (s.vocal + s.rap + s.dance + s.sense + s.charm) * 10) * rebirthMult * hpMult);
+  const cHp = Math.floor((200 + s.charm * 80) * rebirthMult * hpMult);
 
   return (
     <div className="modal-overlay" style={{ zIndex: 1100 }}>
       <div className="modal-content stat-modal">
         <button className="close-btn" onClick={onClose}>X</button>
-        
+
         <div className="stat-layout">
           {/* 좌측: 캐릭터 카드 & 기본 정보 */}
           <div className="stat-col left-col">
-            <div 
+            <div
               className={`stat-card-visual tier-border-${charInfo.tier} clickable-card`}
               onClick={() => setIsCardExpanded(true)}
             >
@@ -155,7 +156,7 @@ export function StatModal({ charId, onClose }: Props) {
                 })}
                 <polygon points={dataPoints} className="radar-data" />
                 {STAT_KEYS.map((key, i) => {
-                  const [x, y] = getPoint(i, 1.3).split(','); 
+                  const [x, y] = getPoint(i, 1.3).split(',');
                   return (
                     <text key={key} x={x} y={y} className="radar-label" textAnchor="middle" dominantBaseline="central">
                       {STAT_NAMES[key]}
@@ -178,9 +179,24 @@ export function StatModal({ charId, onClose }: Props) {
 
           {/* 우측: 스탯 리스트 및 돌파 */}
           <div className="stat-col right-col">
-            <div className="stat-list-header" style={{display: 'flex', justifyContent: 'flex-end', marginBottom: '10px'}}>
-              <button 
-                className="auto-distribute-btn-small" 
+            <div className="stat-list-header" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '10px' }}>
+              <button
+                className="auto-distribute-btn-small"
+                style={{ background: '#e74c3c' }}
+                onClick={() => {
+                  onOpenConfirm({
+                    message: '투자한 스탯을 초기화하고 포인트를 돌려받으시겠습니까? (한계치와 특수 버프는 유지됩니다)',
+                    onConfirm: () => {
+                      resetCharacterStats(charId);
+                      onShowToast('스탯이 초기화되었습니다.');
+                    }
+                  });
+                }}
+              >
+                🔄 초기화
+              </button>
+              <button
+                className="auto-distribute-btn-small"
                 onClick={() => autoDistributeSingleStats(charId)}
               >
                 ✨ 자동 배분
@@ -196,8 +212,8 @@ export function StatModal({ charId, onClose }: Props) {
 
                 // 대표 스킬 버프로 인한 보너스 표시
                 const bonusStat = currentVal - pureVal;
-                const displayVal = bonusStat > 0 
-                  ? <span style={{color: '#2ecc71'}}>{pureVal}+{bonusStat}</span>
+                const displayVal = bonusStat > 0
+                  ? <span style={{ color: '#2ecc71' }}>{pureVal}+{bonusStat}</span>
                   : pureVal;
 
                 return (
@@ -210,14 +226,14 @@ export function StatModal({ charId, onClose }: Props) {
                       </div>
                     </div>
                     <div className="stat-bar-bg">
-                      <div 
-                        className="stat-bar-fill" 
+                      <div
+                        className="stat-bar-fill"
                         style={{ width: `${Math.min(100, (currentVal / maxVal) * 100)}%` }}
                       />
                     </div>
                     <span className="stat-value">{displayVal} / {maxVal}</span>
-                    <button 
-                      className="invest-btn" 
+                    <button
+                      className="invest-btn"
                       disabled={!canInvest}
                       onMouseDown={() => startHoldAction(() => {
                         const s = useGameStore.getState().ownedCharacters[charId];
@@ -239,7 +255,7 @@ export function StatModal({ charId, onClose }: Props) {
             </div>
 
             <div className="breakthrough-section">
-              <button 
+              <button
                 className={`breakthrough-btn ${(isAllMaxed || hasBrokenThrough) ? (canBreakthrough ? 'ready' : 'need-points') : 'not-ready'}`}
                 disabled={!canBreakthrough}
                 onMouseDown={() => startHoldAction(() => {
@@ -270,10 +286,10 @@ export function StatModal({ charId, onClose }: Props) {
       {/* 카드 확대 오버레이 */}
       {isCardExpanded && (
         <div className="expanded-card-overlay" onClick={() => setIsCardExpanded(false)}>
-          <img 
-            src={getCardImageUrl(charId)} 
-            alt={`${charInfo.name} expanded`} 
-            className={`expanded-card-image tier-border-${charInfo.tier}`} 
+          <img
+            src={getCardImageUrl(charId)}
+            alt={`${charInfo.name} expanded`}
+            className={`expanded-card-image tier-border-${charInfo.tier}`}
           />
         </div>
       )}

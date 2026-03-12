@@ -247,7 +247,7 @@
 /* 툴팁을 위한 래퍼 설정 */
 .stat-name-tooltip-wrapper {
   position: relative;
-  width: 90px;
+  width: 75px; /* 65px -> 75px 로 복구하여 "방송감 (S)" 줄바꿈 방지 */
   cursor: help;
 }
 
@@ -256,6 +256,7 @@
   font-weight: bold;
   color: #fff;
   border-bottom: 1px dotted #888; /* 툴팁이 있다는 시각적 힌트 */
+  white-space: nowrap; /* 글씨 줄바꿈 절대 방지 추가 */
 }
 
 .stat-tooltip {
@@ -300,6 +301,7 @@
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid #333;
+  margin-right: 0px; /* 좌측 이름 칸이 늘어난 10px을 상쇄하기 위해 10px -> 0px로 줄임 */
 }
 
 .stat-bar-fill {
@@ -309,11 +311,12 @@
 }
 
 .stat-value {
-  width: 100px;
-  text-align: right;
+  width: 85px; /* 105px -> 85px로 20px 너비 축소 (우측 숫자 칸) */
+  text-align: center;
   font-size: 0.9rem;
   color: #aaa;
   white-space: nowrap;
+  margin-right: 31px; /* 버튼과의 여백을 25px -> 31px로 늘려서 좌측으로 더 밀어냄 */
 }
 
 .invest-btn {

@@ -15,11 +15,17 @@ import { CharacterSelectModal } from './components/CharacterSelectModal';
 import { RebirthModal } from './components/RebirthModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { Toast } from './components/Toast';
+import { LeaderboardModal } from './components/LeaderboardModal';
+import { NicknameModal } from './components/NicknameModal';
+import { GoldenDiskModal } from './components/GoldenDiskModal';
+import { TowerModal } from './components/TowerModal';
 import ticketIcon from './assets/images/ticket.PNG';
 import bookIcon from './assets/images/book.PNG';
 import backgroundImg from './assets/images/backgroud.png';
 import backgroundImg2 from './assets/images/background2.PNG';
 import skill3Image from './assets/images/skill3.png';
+import goldenNoteIcon from './assets/images/golden_note.png';
+import towerIcon from './assets/images/tower.png';
 import { getFrameUrl, getUiImage } from './utils/assets';
 import './App.css';
 
@@ -33,7 +39,7 @@ const getStartFrame = (id: string) => {
 };
 
 type ViewMode = 'normal' | 'chroma' | null;
-type ModalType = 'gachaResult' | 'collection' | 'partySetup' | 'gachaProb' | 'rebirth' | 'stat' | 'charInfo' | null;
+type ModalType = 'gachaResult' | 'collection' | 'partySetup' | 'gachaProb' | 'rebirth' | 'stat' | 'charInfo' | 'leaderboard' | 'goldenDisk' | 'tower' | null;
 type SkillTargetMode = 'boss' | 'ceo' | 'oshi' | null;
 
 interface CharEntity {
@@ -65,7 +71,10 @@ function App() {
   const [isStatClosing, setIsStatClosing] = useState(false);
 
   const [isCombatOpen, setIsCombatOpen] = useState(false);
+  const [combatMode, setCombatMode] = useState<'normal' | 'disk' | 'tower'>('normal');
   const [isGachaMenuOpen, setIsGachaMenuOpen] = useState(false);
+  const [isNicknameModalOpen, setIsNicknameModalOpen] = useState(false);
+  const [pendingRebirthAction, setPendingRebirthAction] = useState<'skill' | 'combat' | null>(null);
   const [skillTargetMode, setSkillTargetMode] = useState<SkillTargetMode>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [introStep, setIntroStep] = useState(0);
@@ -87,14 +96,15 @@ function App() {
   const charEntitiesRef = useRef<CharEntity[]>([]);
   const [pixiReady, setPixiReady] = useState(false);
 
-  const { 
-    poong, tat, totalTps, calculateTps, gameTick, pullGacha, gachaLevel, totalRolls,
+  const {
+    poong, tat, musicalNotes, totalTps, calculateTps, gameTick, pullGacha, gachaLevel, totalRolls,
     bossSkillUnlocked, bossSkillCooldownEnd, unlockBossSkill, useBossSkill,
-    ceoSkillUnlocked, ceoLinkedCharId, unlockCeoSkill, linkCeoSkill, 
+    ceoSkillUnlocked, ceoLinkedCharId, unlockCeoSkill, linkCeoSkill,
     oshiSkillUnlocked, oshiLinkedCharId, unlockOshiSkill, linkOshiSkill,
-    permanentBuffs, currentStage, doRebirth, initGame, saveGame, resetGame
+    permanentBuffs, currentStage, doRebirth, initGame, saveGame, resetGame,
+    setNickname
   } = useGameStore();
-  
+
   const activeRoster = useGameStore(state => state.activeRoster);
 
   useEffect(() => {
@@ -161,18 +171,15 @@ function App() {
   const handleSkillSelect = (charId: string) => {
     if (skillTargetMode === 'boss') {
       useBossSkill(charId);
-      setToastMessage('빕어의 숙제 완료! 랜덤 스탯 & 한계치 +2 증가');
+      setToastMessage('숙제 스탯 펌핑 완료! (랜덤 스탯 대폭 증가)');
     } else if (skillTargetMode === 'ceo') {
       linkCeoSkill(charId);
-      setToastMessage('대표의 가호가 부여되었습니다! (+10)');
+      setToastMessage('대표의 편애가 적용되었습니다! (모든 스탯 +10)');
     } else if (skillTargetMode === 'oshi') {
       const charInfo = CHARACTER_DATA.find(c => c.id === charId);
-      if (charInfo && (charInfo.tier === 'C' || charInfo.tier === 'U')) {
+      if (charInfo) {
         linkOshiSkill(charId);
-        setToastMessage(`[${charInfo.name}] 캐릭터가 최애로 지정되었습니다! (SR급 성능 획득)`);
-      } else {
-        setToastMessage('최애 지정은 C, U 등급 캐릭터만 가능합니다.');
-        return; // 실패 시 모드 해제 안함
+        setToastMessage(`[${charInfo.name}] 사원이 최애로 지정되었습니다!`);
       }
     }
     calculateTps();
@@ -206,7 +213,7 @@ function App() {
           width: w,
           height: h,
           backgroundAlpha: 0, // 리액트 div의 배경(이미지, 크로마키)이 보이도록 항상 투명
-          backgroundColor: 0x000000, 
+          backgroundColor: 0x000000,
           resolution: window.devicePixelRatio || 1,
           autoDensity: true,
           antialias: true,
@@ -234,16 +241,16 @@ function App() {
             if (entity.stateTimer <= 0) {
               if (entity.state === 'walking') {
                 entity.state = 'stopped';
-                entity.stateTimer = 1 + Math.random() * 3; 
+                entity.stateTimer = 1 + Math.random() * 3;
                 entity.walkSprite.visible = false;
                 entity.staySprite.visible = true;
                 entity.walkSprite.stop();
               } else {
                 entity.state = 'walking';
-                entity.stateTimer = 1 + Math.random() * 4; 
+                entity.stateTimer = 1 + Math.random() * 4;
                 entity.dirX = Math.random() > 0.5 ? 1 : -1;
-                entity.dirY = (Math.random() - 0.5) * 2; 
-                entity.spriteContainer.scale.x = entity.dirX; 
+                entity.dirY = (Math.random() - 0.5) * 2;
+                entity.spriteContainer.scale.x = entity.dirX;
                 entity.walkSprite.visible = true;
                 entity.staySprite.visible = false;
                 entity.walkSprite.play();
@@ -257,7 +264,7 @@ function App() {
               // 좌우 벽 충돌 처리
               if (entity.container.x > app.screen.width - 50) {
                 entity.dirX = -1;
-                entity.spriteContainer.scale.x = -1; 
+                entity.spriteContainer.scale.x = -1;
               } else if (entity.container.x < 50) {
                 entity.dirX = 1;
                 entity.spriteContainer.scale.x = 1;
@@ -288,7 +295,7 @@ function App() {
           }
         };
         window.addEventListener('resize', handleResize);
-        
+
         setPixiReady(true);
       } catch (err) {
         console.error("PixiJS Init Error:", err);
@@ -358,15 +365,15 @@ function App() {
           if (stayUrl) {
             const t = await PIXI.Assets.load(stayUrl);
             staySprite.texture = t;
-            
+
             // 크기 대폭 확대: 기본 180, 송밤 170
             // 송밤은 Walk와 Stay 크기 차이 없음 (170), 다른 애들은 Stay가 10px 더 작음 (170)
             const targetWalkHeight = id === 'songbam' ? 170 : 180;
-            const targetStayHeight = 170; 
+            const targetStayHeight = 170;
 
             const walkScaleFactor = targetWalkHeight / t.height;
             const stayScaleFactor = targetStayHeight / t.height;
-            
+
             staySprite.scale.set(stayScaleFactor);
             walkSprite.scale.set(walkScaleFactor);
           }
@@ -387,7 +394,7 @@ function App() {
             const loadedTextures = await Promise.all(urlsToLoad.map(url => PIXI.Assets.load(url)));
             let finalTextures = [];
             const startIdx = getStartFrame(id) - 1;
-            
+
             if (startIdx >= 0 && startIdx < loadedTextures.length) {
               finalTextures = [
                 ...loadedTextures.slice(startIdx),
@@ -396,14 +403,14 @@ function App() {
             } else {
               finalTextures = loadedTextures;
             }
-            
+
             walkSprite.textures = finalTextures;
 
             // 모든 캐릭터의 1회 걷기 루프(전체 프레임 재생)가 동일하게 1.5초 걸리도록 속도 동적 계산
             // 공식: animationSpeed = 프레임수 / (60fps * 루프시간(초))
-            const targetLoopTimeSec = 1.5; 
+            const targetLoopTimeSec = 1.5;
             walkSprite.animationSpeed = finalTextures.length / (60 * targetLoopTimeSec);
-            
+
             walkSprite.play();
           }
         } catch (e) {
@@ -420,7 +427,7 @@ function App() {
 
       app.stage.addChild(container);
 
-      const baseSpeed = 1.2; 
+      const baseSpeed = 1.2;
       const startDirX = Math.random() > 0.5 ? 1 : -1;
       const startDirY = (Math.random() - 0.5) * 2;
       spriteContainer.scale.x = startDirX;
@@ -457,7 +464,7 @@ function App() {
     };
 
     return (
-      <div 
+      <div
         className="mode-selection-screen"
         style={{ background: startBg ? `url(${startBg}) center/cover no-repeat` : '#111' }}
       >
@@ -469,7 +476,7 @@ function App() {
         <div className="intro-container">
           {introStep >= 1 && <img src={icon1} className="intro-icon icon-1" alt="icon1" />}
           {introStep >= 2 && <img src={icon2} className="intro-icon icon-2" alt="icon2" />}
-          
+
           {introStep >= 3 && (
             <div className="button-group intro-buttons">
               <button onClick={() => setViewMode('normal')} className="mode-btn metal-btn">
@@ -484,13 +491,15 @@ function App() {
 
         {/* 공통 컨펌 모달 (시작 화면용) */}
         {confirmConfig && (
-          <ConfirmModal 
-            message={confirmConfig.message} 
-            onConfirm={confirmConfig.onConfirm} 
-            onCancel={() => setConfirmConfig(null)} 
+          <ConfirmModal
+            message={confirmConfig.message}
+            onConfirm={() => {
+              confirmConfig.onConfirm();
+              setConfirmConfig(null);
+            }}
+            onCancel={() => setConfirmConfig(null)}
           />
         )}
-
         {/* 토스트 메시지 (시작 화면용) */}
         {toastMessage && (
           <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
@@ -500,17 +509,17 @@ function App() {
   }
 
   return (
-    <div 
+    <div
       className={`game-overlay ${viewMode}`}
       style={
-        viewMode === 'normal' 
-          ? { background: `url(${backgroundImg}) center/cover no-repeat` } 
+        viewMode === 'normal'
+          ? { background: `url(${backgroundImg}) center/cover no-repeat` }
           : { background: `url(${backgroundImg2}) bottom center / 100% auto no-repeat, #00ff00` }
       }
     >
       {/* 좌상단 스킬 아이콘 패널 */}
       <div className="skills-panel">
-        <div 
+        <div
           className={`skill-icon-wrapper ${bossSkillUnlocked ? 'unlocked' : 'locked'}`}
           onClick={() => {
             if (!bossSkillUnlocked) {
@@ -531,7 +540,7 @@ function App() {
         >
           <img src={skill1Image} alt="boss-skill" />
           <div className="skill-name">빕어의 숙제</div>
-          {!bossSkillUnlocked && <div className="skill-lock">🔒<br/>10k</div>}
+          {!bossSkillUnlocked && <div className="skill-lock">🔒<br />10k</div>}
           {bossSkillUnlocked && currentTime < bossSkillCooldownEnd && (
             <div className="skill-cd">
               {Math.ceil((bossSkillCooldownEnd - currentTime) / 1000)}s
@@ -539,7 +548,7 @@ function App() {
           )}
         </div>
 
-        <div 
+        <div
           className={`skill-icon-wrapper ${ceoSkillUnlocked ? 'unlocked' : 'locked'}`}
           onClick={() => {
             if (!ceoSkillUnlocked) {
@@ -556,13 +565,13 @@ function App() {
         >
           <img src={skill2Image} alt="ceo-skill" />
           <div className="skill-name">대표의 가호</div>
-          {!ceoSkillUnlocked && <div className="skill-lock">🔒<br/>50k</div>}
+          {!ceoSkillUnlocked && <div className="skill-lock">🔒<br />50k</div>}
           {ceoSkillUnlocked && ceoLinkedCharId && (
             <div className="skill-linked">적용중</div>
           )}
         </div>
 
-        <div 
+        <div
           className={`skill-icon-wrapper ${oshiSkillUnlocked ? 'unlocked' : 'locked'}`}
           onClick={() => {
             if (!oshiSkillUnlocked) {
@@ -579,14 +588,14 @@ function App() {
         >
           <img src={skill3Image} alt="oshi-skill" />
           <div className="skill-name">최애 지정</div>
-          {!oshiSkillUnlocked && <div className="skill-lock">🔒<br/>100k</div>}
+          {!oshiSkillUnlocked && <div className="skill-lock">🔒<br />100k</div>}
           {oshiSkillUnlocked && oshiLinkedCharId && (
             <div className="skill-linked">적용중</div>
           )}
         </div>
 
         {/* 창낼용기(환생) 버튼 추가 */}
-        <div 
+        <div
           className="skill-icon-wrapper unlocked rebirth-action-btn"
           style={{ borderColor: '#e74c3c' }}
           onClick={() => {
@@ -596,9 +605,9 @@ function App() {
               setConfirmConfig({
                 message: "정말 창내시겠습니까? (모든 맵 진행도와 풍이 초기화 되며 '탓'을 얻습니다)",
                 onConfirm: () => {
-                  doRebirth();
-                  setToastMessage('창냈습니다! 탓(Tat)을 획득했습니다.');
                   setConfirmConfig(null);
+                  setPendingRebirthAction('skill');
+                  setIsNicknameModalOpen(true);
                 }
               });
             }
@@ -614,16 +623,18 @@ function App() {
       {/* 우측: 재화(풍, 탓) 패널 및 메뉴 버튼 */}
       <div className="ui-layer">
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center' }}>
-          {/* 가챠 티켓 가격 표시 칸을 탓 칸 좌측으로 이동 */}
-          <div className="resource-box tat-box" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', height: '100%', boxSizing: 'border-box' }}>
-            <img src={ticketIcon} alt="ticket" style={{ width: '20px', height: '20px', objectFit: 'contain' }} />
-            <span className="tat-amount" style={{ color: '#f1c40f' }}>
-              {formatCompact(Math.max(10, Math.floor(50 * Math.pow(1.0011, Math.max(0, totalRolls - (permanentBuffs.gachaDiscountLevel * 50))))))} 풍
-            </span>
+          <div
+            className="resource-box tat-box"
+            style={{ borderColor: '#f1c40f', cursor: 'pointer' }}
+            onClick={() => handleOpenModal('goldenDisk')}
+            title="황금 디스크 상점 열기"
+          >
+            <img src={goldenNoteIcon} alt="note" style={{ width: '24px', height: '24px', filter: 'drop-shadow(0 0 4px rgba(241,196,15,0.8))' }} />
+            <span className="tat-amount" style={{ color: '#f1c40f' }}>{formatCompact(musicalNotes)}</span>
           </div>
 
-          <div 
-            className="resource-box tat-box" 
+          <div
+            className="resource-box tat-box"
             onClick={() => handleOpenModal('rebirth')}
             title="탓 상점 열기"
           >
@@ -638,14 +649,24 @@ function App() {
             </div>
           </div>
         </div>
-        
+
         <div className="menu-buttons">
-          <div className="gacha-info-panel">
-             <div className="gacha-level">모집 레벨: Lv.{gachaLevel}</div>
-             <div className="gacha-rolls">누적 모집: {totalRolls}회</div>
-             <button className="gacha-prob-btn" onClick={() => handleOpenModal('gachaProb')}>
-               확률표 보기
-             </button>
+          <div className="gacha-info-panel" style={{ display: 'flex', gap: '10px', alignItems: 'center', alignSelf: 'flex-end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'rgba(0,0,0,0.4)', padding: '4px 8px', borderRadius: '4px' }}>
+                <img src={ticketIcon} alt="ticket" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
+                <span style={{ color: '#f1c40f', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                  {formatCompact(Math.max(10, Math.floor(50 * Math.pow(1.0011, Math.max(0, totalRolls - (permanentBuffs.gachaDiscountLevel * 50))))))} 풍
+                </span>
+              </div>
+              <button className="gacha-prob-btn" onClick={() => handleOpenModal('gachaProb')}>
+                확률표 보기
+              </button>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="gacha-level">모집 레벨: Lv.{gachaLevel}</div>
+              <div className="gacha-rolls" style={{ marginBottom: 0 }}>누적 모집: {totalRolls}회</div>
+            </div>
           </div>
 
           <div className="main-circle-buttons">
@@ -658,8 +679,8 @@ function App() {
                   <button onClick={() => handleGacha('max')} className="max-btn">모두 소모</button>
                 </div>
               )}
-              
-              <button 
+
+              <button
                 className={`gacha-trigger-btn ${isGachaMenuOpen ? 'active' : ''}`}
                 onClick={() => setIsGachaMenuOpen(!isGachaMenuOpen)}
               >
@@ -667,7 +688,7 @@ function App() {
               </button>
             </div>
 
-            <button 
+            <button
               className="gacha-trigger-btn book-btn"
               onClick={() => handleOpenModal('collection')}
             >
@@ -676,15 +697,26 @@ function App() {
           </div>
 
           <div className="main-circle-buttons" style={{ marginTop: '5px' }}>
-            <button 
-              className="gacha-trigger-btn combat-circle-btn" 
+            <button
+              className="gacha-trigger-btn combat-circle-btn"
               onClick={() => handleOpenModal('partySetup')}
             >
               <span className="emoji-icon">⚔️</span>
             </button>
 
-            <button 
-              className="gacha-trigger-btn mode-circle-btn" 
+            {currentStage >= 1 && (
+              <button
+                className="gacha-trigger-btn tower-circle-btn"
+                onClick={() => handleOpenModal('tower')}
+              >
+                <img src={towerIcon} alt="Tower" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              </button>
+            )}
+          </div>
+
+          <div className="main-circle-buttons" style={{ marginTop: '5px' }}>
+            <button
+              className="gacha-trigger-btn mode-circle-btn"
               onClick={async () => {
                 await saveGame();
                 setToastMessage('수동 저장 완료!');
@@ -699,36 +731,49 @@ function App() {
       <div className="character-layer" ref={pixiContainer}>
       </div>
 
+      {/* 우측 하단 리더보드 전용 플로팅 버튼 */}
+      <button
+        className="leaderboard-floating-btn"
+        onClick={() => handleOpenModal('leaderboard')}
+        title="명예의 전당 랭킹 보기"
+      >
+        🏆
+      </button>
+
       {/* 전투 화면 오버레이 */}
       {isCombatOpen && (
-        <CombatScreen 
-          onClose={() => setIsCombatOpen(false)} 
+        <CombatScreen
+          mode={combatMode}
+          onClose={() => setIsCombatOpen(false)}
           onOpenRebirth={() => {
-            // 환생 모달을 열면서 내부적으로 환생 처리 (doRebirth)
-            const { doRebirth } = useGameStore.getState();
-            doRebirth();
-            handleOpenModal('rebirth');
+            setPendingRebirthAction('combat');
+            setIsNicknameModalOpen(true);
           }}
         />
       )}
 
       {/* 캐릭터 선택 모달 (스킬용) */}
       {skillTargetMode && (
-        <CharacterSelectModal 
+        <CharacterSelectModal
           title={
-            skillTargetMode === 'boss' ? '빕어의 숙제 대상을 선택하세요 (랜덤 스탯 대폭 증가)' : 
-            skillTargetMode === 'oshi' ? '최애로 지정할 [C] 또는 [U] 등급을 선택하세요 (SR급 성능)' :
-            '대표의 가호를 내릴 대상을 선택하세요 (+10 부여)'
+            skillTargetMode === 'boss' ? '숙제 스탯 펌핑을 받을 사원을 선택하세요.' :
+              skillTargetMode === 'oshi' ? '최애로 지정할 인원을 선택하세요.' :
+                '대표의 편애를 받을 사원을 선택하세요.'
           }
+          allowedTiers={
+            skillTargetMode === 'oshi'
+              ? ['C', 'U', ...(permanentBuffs.oshiBoostLevel >= 1 ? ['R' as const] : []), ...(permanentBuffs.oshiBoostLevel >= 2 ? ['SR' as const] : [])]
+              : undefined
+          }
+          skillTargetMode={skillTargetMode}
           onClose={() => setSkillTargetMode(null)}
           onSelect={handleSkillSelect}
         />
       )}
-
       {/* 모달 렌더링 (닫힐 때 애니메이션을 위해 closing 상태 포함 렌더링) */}
       {(activeModal === 'rebirth' || closingModal === 'rebirth') && (
         <div className={closingModal === 'rebirth' ? 'modal-closing' : ''}>
-          <RebirthModal 
+          <RebirthModal
             onClose={handleCloseModal}
             onShowToast={(msg) => setToastMessage(msg)}
           />
@@ -737,9 +782,9 @@ function App() {
 
       {(activeModal === 'gachaResult' || closingModal === 'gachaResult') && (
         <div className={closingModal === 'gachaResult' ? 'modal-closing' : ''}>
-          <GachaResultModal 
-            results={gachaResults} 
-            onClose={handleCloseModal} 
+          <GachaResultModal
+            results={gachaResults}
+            onClose={handleCloseModal}
             onPullAgain={handleGacha}
           />
         </div>
@@ -747,17 +792,17 @@ function App() {
 
       {(activeModal === 'gachaProb' || closingModal === 'gachaProb') && (
         <div className={closingModal === 'gachaProb' ? 'modal-closing' : ''}>
-          <GachaProbModal 
+          <GachaProbModal
             currentLevel={gachaLevel}
-            onClose={handleCloseModal} 
+            onClose={handleCloseModal}
           />
         </div>
       )}
-      
+
       {(activeModal === 'collection' || closingModal === 'collection') && (
         <div className={closingModal === 'collection' ? 'modal-closing' : ''}>
-          <CollectionModal 
-            onClose={handleCloseModal} 
+          <CollectionModal
+            onClose={handleCloseModal}
             onSelectChar={handleOpenStat}
             onShowToast={(msg) => setToastMessage(msg)}
           />
@@ -766,9 +811,10 @@ function App() {
 
       {(activeModal === 'partySetup' || closingModal === 'partySetup') && (
         <div className={closingModal === 'partySetup' ? 'modal-closing' : ''}>
-          <PartySetupModal 
-            onClose={handleCloseModal} 
-            onStartCombat={() => {
+          <PartySetupModal
+            onClose={handleCloseModal}
+            onStartCombat={(mode) => {
+              setCombatMode(mode);
               handleCloseModal();
               setIsCombatOpen(true);
             }}
@@ -776,22 +822,79 @@ function App() {
           />
         </div>
       )}
-      
-      {(isStatOpen || isStatClosing) && selectedCharId && (
-        <div className={isStatClosing ? 'modal-closing' : ''}>
-          <StatModal 
-            charId={selectedCharId}
-            onClose={handleCloseStat} 
+
+      {(activeModal === 'goldenDisk' || closingModal === 'goldenDisk') && (
+        <div className={closingModal === 'goldenDisk' ? 'modal-closing' : ''}>
+          <GoldenDiskModal
+            onClose={handleCloseModal}
+            onShowToast={(msg) => setToastMessage(msg)}
           />
         </div>
       )}
 
+      {(activeModal === 'tower' || closingModal === 'tower') && (
+        <div className={closingModal === 'tower' ? 'modal-closing' : ''}>
+          <TowerModal
+            onClose={handleCloseModal}
+            onStartTowerCombat={() => {
+              setCombatMode('tower');
+              handleCloseModal();
+              setIsCombatOpen(true);
+            }}
+            onShowToast={(msg) => setToastMessage(msg)}
+          />
+        </div>
+      )}
+
+      {(activeModal === 'leaderboard' || closingModal === 'leaderboard') && (
+        <div className={closingModal === 'leaderboard' ? 'modal-closing' : ''}>
+          <LeaderboardModal onClose={handleCloseModal} />
+        </div>
+      )}
+
+      {isNicknameModalOpen && (
+        <NicknameModal
+          onConfirm={(name) => {
+            setNickname(name);
+            setIsNicknameModalOpen(false);
+            doRebirth();
+            setToastMessage('창냈습니다! 탓(Tat)을 획득했습니다.');
+            if (pendingRebirthAction === 'combat') {
+              handleOpenModal('rebirth');
+            }
+            setPendingRebirthAction(null);
+          }}
+          onCancel={() => {
+            setIsNicknameModalOpen(false);
+            doRebirth();
+            setToastMessage('창냈습니다! 탓(Tat)을 획득했습니다.');
+            if (pendingRebirthAction === 'combat') {
+              handleOpenModal('rebirth');
+            }
+            setPendingRebirthAction(null);
+          }}
+        />
+      )}
+
+      {(isStatOpen || isStatClosing) && selectedCharId && (
+        <div className={isStatClosing ? 'modal-closing' : ''}>
+          <StatModal
+            charId={selectedCharId}
+            onClose={handleCloseStat}
+            onShowToast={(msg) => setToastMessage(msg)}
+            onOpenConfirm={(config) => setConfirmConfig(config)}
+          />
+        </div>
+      )}
       {/* 공통 컨펌 모달 */}
       {confirmConfig && (
-        <ConfirmModal 
-          message={confirmConfig.message} 
-          onConfirm={confirmConfig.onConfirm} 
-          onCancel={() => setConfirmConfig(null)} 
+        <ConfirmModal
+          message={confirmConfig.message}
+          onConfirm={() => {
+            confirmConfig.onConfirm();
+            setConfirmConfig(null);
+          }}
+          onCancel={() => setConfirmConfig(null)}
         />
       )}
 

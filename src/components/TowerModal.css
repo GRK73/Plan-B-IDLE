@@ -1,0 +1,329 @@
+.tower-modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 200;
+  backdrop-filter: blur(5px);
+}
+
+.tower-modal-content {
+  background: #1e1e24;
+  border: 2px solid #555;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 900px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: white;
+}
+
+.tower-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: #2b2b36;
+  border-bottom: 1px solid #444;
+}
+
+.tower-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #f1c40f;
+  text-shadow: 1px 1px 2px black;
+}
+
+.tower-close-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.tower-tabs {
+  display: flex;
+  background: #222;
+  border-bottom: 1px solid #444;
+}
+
+.tower-tab {
+  flex: 1;
+  padding: 12px 0;
+  text-align: center;
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tower-tab.active {
+  color: #f1c40f;
+  border-bottom: 3px solid #f1c40f;
+  background: #2b2b36;
+}
+
+.tower-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* Challenge Tab */
+.tower-challenge-layout {
+  display: flex;
+  gap: 20px;
+  height: 100%;
+}
+
+.tower-challenge-left {
+  flex: 1.5;
+  display: flex;
+  flex-direction: column;
+  background: #252530;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #444;
+}
+
+.tower-challenge-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.tower-info-box {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.tower-floor-text {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #f1c40f;
+  margin-bottom: 5px;
+}
+
+.tower-enemy-info {
+  font-size: 1.1rem;
+  color: #ccc;
+}
+
+.tower-slots-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  flex: 1;
+}
+
+.tower-slot {
+  background: #2b2b36;
+  border: 2px dashed #555;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  min-height: 150px;
+}
+
+.tower-slot:hover {
+  border-color: #f1c40f;
+  background: #333344;
+}
+
+.tower-slot.empty {
+  color: #666;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.tower-slot-role {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  background: rgba(0,0,0,0.6);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+.tower-slot-char-img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  margin-bottom: 10px;
+}
+
+.tower-slot-info {
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.tower-slot-info div {
+  margin: 2px 0;
+}
+
+.tower-start-btn {
+  width: 100%;
+  padding: 15px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  background: #e67e22;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  transition: background 0.2s;
+}
+
+.tower-start-btn:hover:not(:disabled) {
+  background: #d35400;
+}
+
+.tower-start-btn:disabled {
+  background: #555;
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* Artifacts Tab */
+.tower-fragments-display {
+  text-align: right;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #bdc3c7;
+  margin-bottom: 20px;
+}
+
+.tower-section-title {
+  font-size: 1.2rem;
+  color: #f1c40f;
+  border-bottom: 1px solid #444;
+  padding-bottom: 5px;
+  margin-bottom: 15px;
+}
+
+.tower-upgrades-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.tower-upgrade-card {
+  background: #2b2b36;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tower-upgrade-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.tower-upgrade-name {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.tower-upgrade-level {
+  color: #f1c40f;
+  font-weight: bold;
+}
+
+.tower-upgrade-desc {
+  font-size: 0.9rem;
+  color: #aaa;
+  margin-bottom: 15px;
+  flex: 1;
+}
+
+.tower-upgrade-btn {
+  background: #2980b9;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.tower-upgrade-btn:hover:not(:disabled) {
+  background: #3498db;
+}
+
+.tower-upgrade-btn:disabled {
+  background: #444;
+  color: #777;
+  cursor: not-allowed;
+}
+
+.tower-artifacts-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+}
+
+.tower-artifact-card {
+  background: #2b2b36;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tower-artifact-img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  margin-bottom: 10px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  padding: 5px;
+}
+
+.tower-artifact-name {
+  font-weight: bold;
+  font-size: 1rem;
+  margin-bottom: 5px;
+}
+
+.tower-artifact-desc {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-bottom: 10px;
+  flex: 1;
+}

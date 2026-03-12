@@ -45,6 +45,10 @@ export const getFrameUrl = (filename: string) => {
 };
 
 export const getEnemyImageUrl = (name: string, type: 'stay' | 'atk1' | 'atk2') => {
+  if (name === 'golden_disk') {
+    const key = Object.keys(enemyImages).find(k => k.toLowerCase().includes('golden_disk'));
+    return key ? enemyImages[key] : testSdImage;
+  }
   const key = Object.keys(enemyImages).find(k => k.toLowerCase().includes(`${name}_${type}`));
   return key ? enemyImages[key] : testSdImage;
 };

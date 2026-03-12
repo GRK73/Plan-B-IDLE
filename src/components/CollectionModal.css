@@ -153,18 +153,34 @@
 }
 
 .roster-toggle-btn {
-  margin-top: 8px;
   padding: 4px 12px;
   font-size: 0.85rem;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
-  width: 100%;
 }
 
 .roster-toggle-btn.on { background: #e74c3c; color: white; }
 .roster-toggle-btn.off { background: #2ecc71; color: white; }
+
+.lock-toggle-btn {
+  padding: 4px 8px;
+  font-size: 1rem;
+  background: rgba(0, 0, 0, 0.4);
+  color: white;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.lock-toggle-btn:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
 
 /* 티어별 색상 및 효과 */
 .tier-bg-C { background: #95a5a6; }

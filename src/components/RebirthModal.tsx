@@ -38,7 +38,7 @@ export function RebirthModal({ onClose, onShowToast }: Props) {
       title: '패스트 트랙',
       icon: '🚀',
       description: '초당 최종 풍 생산량(TPS)을 영구적으로 증가시킵니다.',
-      getPreview: (level) => `+${level * 50}%`,
+      getPreview: (level) => `+${level * 200}%`,
       getCost: (level) => Math.floor(30 * Math.pow(level + 1, 1.5))
     },
     {
@@ -56,7 +56,7 @@ export function RebirthModal({ onClose, onShowToast }: Props) {
       title: '하드트레이닝',
       icon: '💪',
       description: '아군 파티의 기본 전투력과 체력을 퍼센트로 증가시켜 줍니다.',
-      getPreview: (level) => `전투 스탯 +${level * 20}%`,
+      getPreview: (level) => `전투 스탯 +${level * 150}%`,
       getCost: (level) => Math.floor(30 * Math.pow(level + 1, 1.5))
     },
     {
@@ -107,18 +107,26 @@ export function RebirthModal({ onClose, onShowToast }: Props) {
     {
       key: 'enemyAtkNerfLevel',
       id: 'enemyAtkNerfLevel',
-      title: '안티 팬덤 (공격력 너프)',
+      title: '악플러 차단 (공격력 감소)',
       icon: '🛡️',
-      description: '안티 팬덤을 형성하여 적 보스의 공격력을 영구적으로 약화시킵니다. (복리 감소)',
-      getPreview: (level) => `공격 배율 x${Math.pow(0.9, level).toFixed(2)}`,
+      description: '악플러들의 공격력을 영구적으로 감소시킵니다. (곱연산)',
+      getPreview: (level) => `공격력 배율 x${Math.pow(0.9, level).toFixed(2)}`,
       getCost: (level) => Math.floor(100 * Math.pow(level + 1, 1.5))
-    }
-  ];
+    },
+    {
+      key: 'oshiBoostLevel',
+      id: 'oshiBoostLevel',
+      title: '최애 지정 등급 확장',
+      icon: '🌟',
+      description: '최애로 지정할 수 있는 사원의 등급을 확장합니다. (1Lv: R등급 가능, 2Lv: SR등급 가능)',
+      getPreview: (level) => level === 0 ? 'C, U 등급' : level === 1 ? 'C, U, R 등급' : level === 2 ? '모든 등급' : 'MAX',
+      getCost: (level) => level >= 2 ? Infinity : 150 * (level + 1)
+    }];
 
   const [selectedBuffId, setSelectedBuffId] = useState<string>(buffOptions[0].id);
 
   const selectedOption = buffOptions.find(o => o.id === selectedBuffId) || buffOptions[0];
-  const currentLevel = permanentBuffs[selectedOption.key];
+  const currentLevel = permanentBuffs[selectedOption.key] || 0;
   const cost = selectedOption.getCost(currentLevel);
 
   const handleBuy = () => {
@@ -141,11 +149,11 @@ export function RebirthModal({ onClose, onShowToast }: Props) {
           {/* 좌측 그리드 */}
           <div className="buff-grid-compact">
             {buffOptions.map(opt => {
-              const lvl = permanentBuffs[opt.key];
+              const lvl = permanentBuffs[opt.key] || 0;
               const isSelected = selectedBuffId === opt.id;
               return (
-                <div 
-                  key={opt.id} 
+                <div
+                  key={opt.id}
                   className={`compact-buff-card ${isSelected ? 'selected' : ''}`}
                   onClick={() => setSelectedBuffId(opt.id)}
                 >
@@ -162,7 +170,7 @@ export function RebirthModal({ onClose, onShowToast }: Props) {
             <div className="detail-icon">{selectedOption.icon}</div>
             <h3 className="detail-title">{selectedOption.title}</h3>
             <p className="detail-desc">{selectedOption.description}</p>
-            
+
             <div className="detail-stats">
               <div className="stat-row">
                 <span>현재 능력치 </span>
@@ -174,12 +182,12 @@ export function RebirthModal({ onClose, onShowToast }: Props) {
               </div>
             </div>
 
-            <button 
-              className="buy-btn-large" 
-              onClick={handleBuy} 
-              disabled={tat < cost}
+            <button
+              className="buy-btn-large"
+              onClick={handleBuy}
+              disabled={tat < cost || cost === Infinity}
             >
-              성장 ({cost.toLocaleString()} 탓)
+              {cost === Infinity ? '최대 레벨 도달' : `성장 (${cost.toLocaleString()} 탓)`}
             </button>
           </div>
         </div>

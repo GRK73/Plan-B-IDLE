@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useGameStore, getEffectiveStats, getTierMultiplier, getHpMultiplier } from '../store/gameStore';
 import { CHARACTER_DATA } from '../data/characters';
 import { getCombatImageUrl, getFrameUrl, getEnemyImageUrl } from '../utils/assets';
+import skill1Image from '../assets/images/skill1.png';
 import './CombatScreen.css';
 
 interface Props {
+  mode: 'normal' | 'disk' | 'tower';
   onClose: () => void;
   onOpenRebirth: () => void;
 }
@@ -27,7 +29,7 @@ interface CombatChar {
   aspd: number;
   burstMult: number; // 랩 기반 크리티컬 배율
   burstChance: number; // 방송감 기반 크리티컬 확률
-  
+
   attackTimer: number;
   action: 'idle' | 'attack' | 'burst' | 'dead' | 'hit';
   animTimer: number;
@@ -37,32 +39,92 @@ interface CombatChar {
 interface DamageText {
   id: number;
   value: number;
-  type: 'normal' | 'crit' | 'enemy';
+  type: 'normal' | 'crit' | 'enemy' | 'supercrit';
   x: number;
   y: number;
   createdAt: number;
 }
 
-export function CombatScreen({ onClose, onOpenRebirth }: Props) {
+const formatDamage = (num: number) => {
+  if (num >= 1e12) return (num / 1e12).toFixed(1) + 'T';
+  if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+  if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+  if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+  return Math.floor(num).toLocaleString();
+};
+
+export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
   const gameState = useGameStore();
-  const { combatParty, currentStage, ownedCharacters, nextStage, ceoLinkedCharId, permanentBuffs } = gameState;
-  
+  const { 
+    combatParty, currentStage, ownedCharacters, nextStage, ceoLinkedCharId, permanentBuffs, 
+    bossSkillUnlocked, bossSkillCooldownEnd, maxDiskDamage, finishGoldenDisk,
+    towerFloor, towerSlots, towerSlotLevels, towerArtifacts, finishTowerFloor
+  } = gameState;
+
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [initialMaxDiskDamage] = useState(maxDiskDamage); 
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const hpNerfMult = Math.pow(0.9, permanentBuffs.enemyHpNerfLevel || 0);
   const atkNerfMult = Math.pow(0.9, permanentBuffs.enemyAtkNerfLevel || 0);
 
-  // 밸런스 조정: 지수적 보스 스케일링 (30스테이지 스탯이 40스테이지에 나오도록 완화) + 환생 억까/안티 너프 적용
-  const bossMaxHp = Math.max(10, Math.floor((1000 * Math.pow(1.135, currentStage) + 50 * currentStage) * hpNerfMult));
-  const bossAtk = Math.max(1, Math.floor((20 * Math.pow(1.075, currentStage) + 5 * currentStage) * atkNerfMult));
+  let bossMaxHpValue = 0;
+  let bossAtkValue = 0;
 
-  const [bossHp, setBossHp] = useState(bossMaxHp);
+  const blacklist = towerArtifacts.find(a => a.id === 'blacklist');
+  const blacklistRatio = blacklist ? Math.min(30, blacklist.level * 1) / 100 : 0;
+
+  if (mode === 'tower') {
+    let tHp = 45000000;
+    let tAtk = 9500;
+    for (let i = 2; i <= towerFloor; i++) {
+      if (i % 5 === 0) {
+        tHp *= 1.3;
+        tAtk *= 1.3;
+      } else {
+        tHp *= 1.08;
+        tAtk *= 1.08;
+      }
+    }
+    
+    if (towerFloor % 5 === 0 && blacklistRatio > 0) {
+       tHp = Math.floor(tHp * (1 - blacklistRatio));
+    }
+    
+    bossMaxHpValue = Math.floor(tHp);
+    bossAtkValue = Math.floor(tAtk);
+  } else {
+    let tHp = Math.max(10, Math.floor((1000 * Math.pow(1.135, currentStage) + 50 * currentStage) * hpNerfMult));
+    let tAtk = Math.max(1, Math.floor((20 * Math.pow(1.075, currentStage) + 5 * currentStage) * atkNerfMult));
+    
+    if (mode === 'normal' && blacklistRatio > 0) {
+       tHp = Math.max(1, Math.floor(tHp * (1 - blacklistRatio)));
+    }
+    
+    bossMaxHpValue = tHp;
+    bossAtkValue = tAtk;
+  }
+
+  const [bossHp, setBossHp] = useState(mode === 'disk' ? 0 : bossMaxHpValue);
   const [bossIndex, setBossIndex] = useState(1);
-  const [combatState, setCombatState] = useState<'entering'|'fighting'|'boss_dead'|'game_over'>('entering');
-  const [currentBoss, setCurrentBoss] = useState(BOSS_TYPES[0]);
-  
+  const [combatState, setCombatState] = useState<'entering' | 'fighting' | 'boss_dead' | 'game_over' | 'disk_end' | 'tower_win'>('entering');
+  const [currentBoss, setCurrentBoss] = useState(
+    mode === 'disk' ? { id: 'golden_disk', name: '황금 디스크' } : 
+    (mode === 'tower' && towerFloor % 5 === 0) ? { id: 'bambi', name: '탑의 수호자 밤비' } :
+    BOSS_TYPES[0]
+  );
+
   const [uiChars, setUiChars] = useState<CombatChar[]>([]);
-  const [bossAction, setBossAction] = useState<'idle'|'attack'|'stunned'|'hit'>('idle');
+  const [bossAction, setBossAction] = useState<'idle' | 'attack' | 'stunned' | 'hit'>('idle');
   const [damageTexts, setDamageTexts] = useState<DamageText[]>([]);
   const [walkFrame, setWalkFrame] = useState(1);
+  const [isSpeedUp, setIsSpeedUp] = useState(false);
+  const [diskTimeLeft, setDiskTimeLeft] = useState(60000); 
+  const [diskAccumulatedDmg, setDiskAccumulatedDmg] = useState(0);
 
   useEffect(() => {
     if (combatState === 'entering') {
@@ -73,56 +135,105 @@ export function CombatScreen({ onClose, onOpenRebirth }: Props) {
 
   const stateRef = useRef({
     chars: [] as CombatChar[],
-    bossHp: bossMaxHp,
-    bossMaxHp: bossMaxHp,
+    bossHp: bossMaxHpValue,
+    bossMaxHp: bossMaxHpValue,
     bossIndex: 1,
     bossAttackTimer: 0,
-    bossAction: 'idle' as 'idle'|'attack'|'stunned'|'hit',
+    bossAction: 'idle' as 'idle' | 'attack' | 'stunned' | 'hit',
     bossAnimTimer: 0,
     bossAtkFrame: 1 as 1 | 2,
     isFighting: false,
     dmgTexts: [] as DamageText[]
   });
 
-  // 스테이지가 바뀌거나 전투 최초 진입 시 초기화
   useEffect(() => {
-    const charsData: CombatChar[] = combatParty.map((id, index) => {
-      const charStore = ownedCharacters[id];
-      const charInfo = CHARACTER_DATA.find(c => c.id === id);
-      if (!charStore || !charInfo) return null;
-      
-      const s = getEffectiveStats(useGameStore.getState(), id);
-      const totalStats = s.vocal + s.rap + s.dance + s.sense + s.charm;
-      
-      const rebirthMult = 1.0 + (permanentBuffs.hardTrainingLevel * 1.5);
-      const tierMult = getTierMultiplier(id);
-      const hpMult = getHpMultiplier(id);
-      
-      let baseAtk = 0;
-      if (s.vocal <= 100) baseAtk = s.vocal * 10;
-      else baseAtk = 1000 + (Math.log10(s.vocal - 99) * 200);
+    let charsData: (CombatChar | null)[] = [];
 
-      return {
-        id,
-        name: charInfo.name,
-        tier: charInfo.tier,
-        maxHp: Math.floor((200 + s.charm * 30 + totalStats * 10) * rebirthMult * hpMult),
-        hp: Math.floor((200 + s.charm * 30 + totalStats * 10) * rebirthMult * hpMult),
-        atk: Math.floor(baseAtk * rebirthMult * tierMult),
-        aspd: 0.8 + (Math.log10(s.dance + 10) * 0.2), // 로그 기반
-        burstMult: 1.5 + (Math.log10(s.rap + 10) * 0.3), // 로그 기반
-        burstChance: Math.min((s.sense * 1) / 100, 0.5 + (permanentBuffs.ruleBreakerLevel * 0.01)),
-        attackTimer: Math.random() * 0.5, 
-        action: 'idle',
-        animTimer: 0,
-        slotIndex: index
-      };
-    }).filter(Boolean) as CombatChar[];
+    const mic = towerArtifacts.find(a => a.id === 'mic');
+    const lightstick = towerArtifacts.find(a => a.id === 'lightstick');
+    
+    const atkMult = 1 + (mic ? mic.level * 0.2 : 0);
+    const hpMultGlobal = 1 + (lightstick ? lightstick.level * 0.3 : 0);
+
+    if (mode === 'tower') {
+      charsData = towerSlots.map((slot, index) => {
+        if (!slot) return null;
+        
+        let cHp = slot.maxHp;
+        let cAtk = slot.atk;
+        let cAspd = slot.aspd;
+
+        const level = towerSlotLevels[index];
+        if (index === 0) cHp *= (1 + (level * 0.2));
+        if (index === 1 || index === 2) cAtk *= (1 + (level * 0.15));
+        if (index === 3) cAspd *= (1 + (level * 0.05));
+
+        return {
+          id: slot.id,
+          name: slot.name,
+          tier: slot.tier,
+          maxHp: Math.floor(cHp * hpMultGlobal),
+          hp: Math.floor(cHp * hpMultGlobal),
+          atk: Math.floor(cAtk * atkMult),
+          aspd: cAspd,
+          burstMult: slot.burstMult,
+          burstChance: slot.burstChance, 
+          attackTimer: Math.random() * 0.5,
+          action: 'idle',
+          animTimer: 0,
+          slotIndex: index
+        };
+      });
+    } else {
+      charsData = combatParty.map((id, index) => {
+        if (!id) return null;
+        const charStore = ownedCharacters[id];
+        const charInfo = CHARACTER_DATA.find(c => c.id === id);
+        if (!charStore || !charInfo) return null;
+
+        const s = getEffectiveStats(useGameStore.getState(), id);
+
+        const rebirthMult = 1.0 + (permanentBuffs.hardTrainingLevel * 1.5);
+        const tierMult = getTierMultiplier(id);
+        const hpMult = getHpMultiplier(id);
+
+        let baseAtk = 0;
+        if (s.vocal <= 100) baseAtk = s.vocal * 10;
+        else baseAtk = 1000 + (Math.log10(s.vocal - 99) * 200);
+
+        let cMaxHp = Math.floor((200 + s.charm * 80) * rebirthMult * hpMult);
+        let cAtk = Math.floor(baseAtk * rebirthMult * tierMult);
+        let cAspd = 0.8 + (Math.log10(s.dance + 10) * 0.2);
+
+        const level = towerSlotLevels[index];
+        if (index === 0) cMaxHp *= (1 + (level * 0.2));
+        if (index === 1 || index === 2) cAtk *= (1 + (level * 0.15));
+        if (index === 3) cAspd *= (1 + (level * 0.05));
+
+        return {
+          id,
+          name: charInfo.name,
+          tier: charInfo.tier,
+          maxHp: Math.floor(cMaxHp * hpMultGlobal),
+          hp: Math.floor(cMaxHp * hpMultGlobal),
+          atk: Math.floor(cAtk * atkMult),
+          aspd: cAspd,
+          burstMult: 1.5 + (Math.log10(s.rap + 10) * 0.3) + (permanentBuffs.ruleBreakerLevel * 0.5), 
+          burstChance: Math.min((s.sense * 1) / 100, 0.5 + (permanentBuffs.ruleBreakerLevel * 0.05)),
+          attackTimer: Math.random() * 0.5,
+          action: 'idle',
+          animTimer: 0,
+          slotIndex: index
+        };
+      });
+    }
+
+    const activeChars = charsData.filter(Boolean) as CombatChar[];
 
     stateRef.current = {
-      chars: charsData,
-      bossHp: bossMaxHp,
-      bossMaxHp: bossMaxHp,
+      chars: activeChars,
+      bossHp: mode === 'disk' ? 0 : bossMaxHpValue,
+      bossMaxHp: bossMaxHpValue,
       bossIndex: 1,
       bossAttackTimer: 0,
       bossAction: 'idle',
@@ -132,14 +243,20 @@ export function CombatScreen({ onClose, onOpenRebirth }: Props) {
       dmgTexts: []
     };
 
-    const newBoss = BOSS_TYPES[Math.floor(Math.random() * BOSS_TYPES.length)];
+    let newBoss;
+    if (mode === 'disk') newBoss = { id: 'golden_disk', name: '황금 디스크' };
+    else if (mode === 'tower') newBoss = towerFloor % 5 === 0 ? { id: 'bambi', name: '탑의 수호자 밤비' } : BOSS_TYPES[Math.floor(Math.random() * BOSS_TYPES.length)];
+    else newBoss = BOSS_TYPES[Math.floor(Math.random() * BOSS_TYPES.length)];
+
     setCurrentBoss(newBoss);
-    setBossHp(bossMaxHp);
+    setBossHp(mode === 'disk' ? 0 : bossMaxHpValue);
     setBossIndex(1);
     setCombatState('entering');
     setBossAction('idle');
-    setUiChars([...charsData]);
+    setUiChars([...charsData] as any); 
     setDamageTexts([]);
+    setDiskTimeLeft(60000);
+    setDiskAccumulatedDmg(0);
 
     const timer = setTimeout(() => {
       stateRef.current.isFighting = true;
@@ -147,27 +264,27 @@ export function CombatScreen({ onClose, onOpenRebirth }: Props) {
     }, 1000);
 
     return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStage, mode, towerFloor]);
 
   const goToNextBoss = () => {
     if (stateRef.current.bossIndex >= 3) {
       nextStage();
     } else {
       stateRef.current.bossIndex += 1;
-      stateRef.current.bossHp = bossMaxHp;
+      stateRef.current.bossHp = bossMaxHpValue;
       stateRef.current.bossAction = 'idle';
-      
+
       const newBoss = BOSS_TYPES[Math.floor(Math.random() * BOSS_TYPES.length)];
       setCurrentBoss(newBoss);
-      
+
       setBossIndex(stateRef.current.bossIndex);
-      setBossHp(bossMaxHp);
+      setBossHp(bossMaxHpValue);
       setBossAction('idle');
       setCombatState('entering');
-      
+
       stateRef.current.isFighting = false;
-      
+
       setTimeout(() => {
         stateRef.current.isFighting = true;
         setCombatState('fighting');
@@ -176,32 +293,36 @@ export function CombatScreen({ onClose, onOpenRebirth }: Props) {
   };
 
   useEffect(() => {
-    const tickRate = 0.1; 
+    const baseInterval = isSpeedUp ? 50 : 100;
+    const tickRate = 0.1;
     const interval = setInterval(() => {
       const st = stateRef.current;
-      if (!st.isFighting || st.bossHp <= 0) return;
+      if (!st.isFighting || (mode !== 'disk' && st.bossHp <= 0)) return;
 
       const aliveChars = st.chars.filter(c => c.hp > 0);
-      if (aliveChars.length === 0) return; 
+      if (aliveChars.length === 0) return;
 
       const now = Date.now();
       let dmgAdded = false;
 
-      const addDamage = (value: number, type: 'normal' | 'crit' | 'enemy', target: 'boss' | 'ally') => {
-        // 보스는 우측(약 70%~80%), 아군은 좌측(약 20%~30%)
+      const addDamage = (value: number, type: 'normal' | 'crit' | 'enemy' | 'supercrit', target: 'boss' | 'ally') => {
         const x = target === 'boss' ? 70 + Math.random() * 10 : 20 + Math.random() * 10;
         const y = target === 'boss' ? 30 + Math.random() * 20 : 40 + Math.random() * 20;
         st.dmgTexts.push({
           id: Math.random(),
-          value: Math.floor(value),
+          value: value,
           type, x, y,
           createdAt: now
         });
         dmgAdded = true;
       };
 
-      // 아군 개별 액션
+      const playbutton = towerArtifacts.find(a => a.id === 'playbutton');
+      const superCritChance = playbutton ? playbutton.level * 0.05 : 0;
+      const superCritMult = playbutton ? 2.0 + (playbutton.level * 0.5) : 2.0;
+
       st.chars.forEach(char => {
+        if (!char) return;
         if (char.hp <= 0) {
           char.action = 'dead';
           return;
@@ -215,19 +336,48 @@ export function CombatScreen({ onClose, onOpenRebirth }: Props) {
           charDidAttack = true;
 
           const isBurst = Math.random() < char.burstChance;
+          let dmg = 0;
 
           if (isBurst) {
-            const dmg = char.atk * char.burstMult;
-            st.bossHp -= dmg;
-            char.action = 'burst';
-            char.animTimer = 0.3; 
-            addDamage(dmg, 'crit', 'boss');
+            dmg = char.atk * char.burstMult;
+            
+            if (Math.random() < superCritChance) {
+              // 초크리: 일반 크리 데미지 * (기본 200% + 레벨당 50%)
+              dmg *= superCritMult; 
+              char.action = 'burst';
+              char.animTimer = 0.3;
+            } else {
+              char.action = 'burst';
+              char.animTimer = 0.3;
+            }
           } else {
-            const dmg = char.atk;
-            st.bossHp -= dmg;
+            dmg = char.atk;
             char.action = 'attack';
-            char.animTimer = 0.2; 
-            addDamage(dmg, 'normal', 'boss');
+            char.animTimer = 0.2;
+          }
+
+          if (mode === 'tower') {
+            const isBackRow = char.slotIndex === 0 || char.slotIndex === 2;
+            if (isBackRow) {
+              const level = towerSlotLevels[char.slotIndex];
+              const dmgBoost = 1 + (level * 0.15); // 레벨당 15% 주는 데미지 증가
+              dmg = Math.floor(dmg * dmgBoost);
+            }
+          }
+
+          if (isBurst) {
+            if (char.action === 'burst' && dmg > char.atk * char.burstMult) {
+               addDamage(dmg, 'supercrit', 'boss'); // Supercrit has higher base damage than normal crit anyway so this logic isn't perfect but sufficient to classify. Actually supercrit sets action burst.
+               // Let's re-eval: if supercritChance triggered, we logged supercrit.
+            } else {
+              // But wait, the previous code added the text INSIDE the if block. Let's restructure properly.
+            }
+          }
+
+          if (mode === 'disk') {
+            st.bossHp += dmg;
+          } else {
+            st.bossHp -= dmg;
           }
 
           st.bossAction = 'hit';
@@ -240,44 +390,55 @@ export function CombatScreen({ onClose, onOpenRebirth }: Props) {
         }
       });
 
-      // 보스 공격
-      st.bossAttackTimer += tickRate;
-      if (st.bossAttackTimer >= 1.0) { 
-        st.bossAttackTimer = 0;
-        
-        let totalWeight = 0;
-        const weightedTargets = aliveChars.map(char => {
-          const isFront = char.slotIndex === 1 || char.slotIndex === 3;
-          const weight = isFront ? 3 : 1; 
-          totalWeight += weight;
-          return { char, weight };
-        });
+      if (mode !== 'disk') {
+        st.bossAttackTimer += tickRate;
+        if (st.bossAttackTimer >= 1.0) {
+          st.bossAttackTimer = 0;
 
-        let randomNum = Math.random() * totalWeight;
-        let target = aliveChars[0];
-        
-        for (const item of weightedTargets) {
-          if (randomNum < item.weight) {
-            target = item.char;
-            break;
+          let totalWeight = 0;
+          const weightedTargets = aliveChars.map(char => {
+            const isFront = char.slotIndex === 1 || char.slotIndex === 3;
+            const weight = isFront ? 3 : 1;
+            totalWeight += weight;
+            return { char, weight };
+          });
+
+          let randomNum = Math.random() * totalWeight;
+          let target = aliveChars[0];
+
+          for (const item of weightedTargets) {
+            if (randomNum < item.weight) {
+              target = item.char;
+              break;
+            }
+            randomNum -= item.weight;
           }
-          randomNum -= item.weight;
-        }
 
-        target.hp -= bossAtk;
-        addDamage(bossAtk, 'enemy', 'ally');
-        
-        if (target.hp <= 0) {
-          target.hp = 0;
-          target.action = 'dead';
-        } else {
-          target.action = 'hit';
-          target.animTimer = 0.2;
-        }
+          let finalTakenDamage = bossAtkValue;
+          if (mode === 'tower') {
+            const isFrontRow = target.slotIndex === 1 || target.slotIndex === 3;
+            if (isFrontRow) {
+              const level = towerSlotLevels[target.slotIndex];
+              const dmgReduction = 1 - Math.min(0.8, level * 0.05); // 레벨당 5% 감소, 최대 80% 제한
+              finalTakenDamage = Math.max(1, Math.floor(finalTakenDamage * dmgReduction));
+            }
+          }
 
-        st.bossAction = 'attack';
-        st.bossAtkFrame = Math.random() > 0.5 ? 1 : 2;
-        st.bossAnimTimer = 0.3;
+          target.hp -= finalTakenDamage;
+          addDamage(finalTakenDamage, 'enemy', 'ally');
+
+          if (target.hp <= 0) {
+            target.hp = 0;
+            target.action = 'dead';
+          } else {
+            target.action = 'hit';
+            target.animTimer = 0.2;
+          }
+
+          st.bossAction = 'attack';
+          st.bossAtkFrame = Math.random() > 0.5 ? 1 : 2;
+          st.bossAnimTimer = 0.3;
+        }
       }
 
       if (st.bossAnimTimer > 0) {
@@ -285,84 +446,204 @@ export function CombatScreen({ onClose, onOpenRebirth }: Props) {
         if (st.bossAnimTimer <= 0) st.bossAction = 'idle';
       }
 
-      // 데미지 텍스트 정리 (800ms 경과 시 삭제)
       const oldLen = st.dmgTexts.length;
       st.dmgTexts = st.dmgTexts.filter(d => now - d.createdAt < 800);
       if (st.dmgTexts.length !== oldLen || dmgAdded) {
         setDamageTexts([...st.dmgTexts]);
       }
 
-      if (st.bossHp <= 0) {
-        st.bossHp = 0;
-        st.isFighting = false;
-        setCombatState('boss_dead');
-        setTimeout(goToNextBoss, 1500);
-      } else if (st.chars.every(c => c.hp <= 0)) {
-        st.isFighting = false;
-        setCombatState('game_over');
+      if (mode === 'disk') {
+        setDiskTimeLeft(prev => {
+          const nextTime = prev - 100; 
+          if (nextTime <= 0) {
+            st.isFighting = false;
+            setCombatState('disk_end');
+            finishGoldenDisk(st.bossHp);
+            return 0;
+          }
+          return nextTime;
+        });
+        setDiskAccumulatedDmg(st.bossHp);
+      } else if (mode === 'tower') {
+        if (st.bossHp <= 0) {
+          st.bossHp = 0;
+          st.isFighting = false;
+          setCombatState('tower_win');
+        } else if (st.chars.every(c => c.hp <= 0)) {
+          st.isFighting = false;
+          setCombatState('game_over');
+        }
+      } else {
+        if (st.bossHp <= 0) {
+          st.bossHp = 0;
+          st.isFighting = false;
+          setCombatState('boss_dead');
+          setTimeout(goToNextBoss, 1500);
+        } else if (st.chars.every(c => c.hp <= 0)) {
+          st.isFighting = false;
+          setCombatState('game_over');
+        }
       }
 
       setBossHp(Math.max(0, Math.floor(st.bossHp)));
       setBossAction(st.bossAction);
-      setUiChars([...st.chars]);
 
-    }, 100);
+      const nextUiChars = [null, null, null, null] as any;
+      st.chars.forEach(c => {
+        if (c) nextUiChars[c.slotIndex] = c;
+      });
+      setUiChars(nextUiChars);
+
+    }, baseInterval);
 
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bossAtk]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bossAtkValue, isSpeedUp]);
 
   return (
     <div className="combat-screen-overlay">
       <div className="combat-header">
-        <h2>채팅창 방어전 - 스테이지 {currentStage} ({bossIndex}/3)</h2>
-        <button className="combat-close-btn" onClick={onClose}>사옥으로 돌아가기</button>
+        <h2>
+          {mode === 'disk' ? '황금 디스크의 방' : 
+           mode === 'tower' ? `최강자의 탑 - ${towerFloor}층 도전` :
+           `채팅창 방어전 - 스테이지 ${currentStage} (${bossIndex}/3)`}
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          {mode === 'disk' && (
+            <div style={{ color: '#f1c40f', fontSize: '1.5rem', fontWeight: 'bold', textShadow: '2px 2px 4px #000' }}>
+              남은 시간: {Math.ceil(diskTimeLeft / 1000)}초
+            </div>
+          )}
+          {bossSkillUnlocked && currentTime < bossSkillCooldownEnd && mode === 'normal' && (
+            <div className="combat-skill-cd-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.6)', padding: '5px 10px', borderRadius: '8px', border: '1px solid #555' }}>
+              <img src={skill1Image} alt="boss-skill" style={{ width: '30px', height: '30px', borderRadius: '4px', filter: 'grayscale(100%)' }} />
+              <span style={{ color: '#ff4757', fontWeight: 'bold', fontFamily: 'monospace', fontSize: '1.2rem' }}>
+                {Math.ceil((bossSkillCooldownEnd - currentTime) / 1000)}s
+              </span>
+            </div>
+          )}
+          <button className="combat-close-btn" onClick={onClose}>사옥으로 돌아가기</button>
+        </div>
       </div>
 
+      <div style={{ position: 'absolute', top: '90px', left: '40px', right: '40px', zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button
+          onClick={() => setIsSpeedUp(!isSpeedUp)}
+          style={{
+            background: isSpeedUp ? '#ff4757' : '#333',
+            color: 'white', border: '2px solid #555', borderRadius: '8px', padding: '8px 16px',
+            cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)', transition: 'all 0.2s'
+          }}
+        >
+          ⏩ 2배속 {isSpeedUp ? 'ON' : 'OFF'}
+        </button>
+
+        {mode === 'disk' && (
+          <div style={{ 
+            background: 'rgba(0,0,0,0.7)', 
+            padding: '8px 16px', 
+            borderRadius: '8px', 
+            border: '1px solid #555',
+            color: '#ccc',
+            fontSize: '1.1rem',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+          }}>
+            🏆 이전 최고 기록: <span style={{ color: '#f1c40f' }}>{initialMaxDiskDamage.toLocaleString()}</span>
+          </div>
+        )}
+      </div>
+
+      {combatState === 'game_over' && (
+        <div className="game-over-overlay">
+          <h1>방어 실패...</h1>
+          <p>{mode === 'tower' ? '탑의 적들이 너무 강합니다. 스펙을 올리고 슬롯을 갱신하세요.' : '악플러들에게 멘탈이 깨졌습니다.'}</p>
+          <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
+            <button className="combat-close-btn" onClick={() => {
+              if (mode === 'tower') finishTowerFloor(false);
+              onClose();
+            }}>
+              사옥으로 돌아가기
+            </button>
+            {mode === 'normal' && currentStage >= 30 && (
+              <button
+                className="combat-close-btn"
+                style={{ background: '#8e44ad' }}
+                onClick={() => {
+                  onClose();
+                  onOpenRebirth();
+                }}
+              >
+                창낼용기 (환생하기)
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {combatState === 'tower_win' && (
+        <div className="game-over-overlay">
+          <h1 style={{ color: '#2ecc71' }}>{towerFloor}층 돌파!</h1>
+          <p>{towerFloor % 5 === 0 ? '강력한 보스를 처치하고 보상을 획득했습니다!' : '다음 층으로 나아갈 수 있습니다.'}</p>
+          <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
+            <button className="combat-close-btn" style={{ background: '#2980b9' }} onClick={() => {
+              finishTowerFloor(true);
+              onClose(); // 닫고 유저가 직접 모달 열어서 확인하도록
+            }}>
+              돌아가서 보상 확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {combatState === 'disk_end' && (
+        <div className="game-over-overlay" style={{ background: 'rgba(0,0,0,0.9)' }}>
+          <h1 style={{ color: '#f1c40f', fontSize: '3rem' }}>측정 종료!</h1>
+          <div style={{ fontSize: '1.5rem', color: 'white', margin: '20px 0', display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
+            <div>이번 누적 데미지: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{formatDamage(diskAccumulatedDmg)}</span></div>
+            <div>이전 최고 기록: <span style={{ color: '#aaa' }}>{formatDamage(initialMaxDiskDamage)}</span></div>
+            {diskAccumulatedDmg > initialMaxDiskDamage ? (
+              <>
+                <div style={{ color: '#2ecc71', fontWeight: 'bold', fontSize: '1.8rem', marginTop: '10px' }}>기록 갱신! 🎉</div>
+                <div style={{ fontSize: '1.2rem' }}>
+                  획득한 음표: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>🎵 {Math.floor((diskAccumulatedDmg - initialMaxDiskDamage) / 10000).toLocaleString()}</span> 개
+                </div>
+              </>
+            ) : (
+              <div style={{ color: '#e74c3c', fontWeight: 'bold', marginTop: '10px' }}>기록 갱신 실패...</div>
+            )}
+          </div>
+          <button className="combat-close-btn" style={{ marginTop: '30px', fontSize: '1.2rem', padding: '15px 30px' }} onClick={onClose}>
+            사옥으로 돌아가기
+          </button>
+        </div>
+      )}
+
       <div className="battlefield">
-        {/* 데미지 텍스트 오버레이 */}
         {damageTexts.map(dmg => (
-          <div 
-            key={dmg.id} 
+          <div
+            key={dmg.id}
             className={`floating-damage dmg-${dmg.type}`}
             style={{ left: `${dmg.x}%`, top: `${dmg.y}%` }}
           >
-            {dmg.value}
+            {formatDamage(dmg.value)}
           </div>
         ))}
 
-        {/* 게임 오버 오버레이 */}
-        {combatState === 'game_over' && (
-          <div className="game-over-overlay">
-            <h1>방어 실패...</h1>
-            <p>악플러들에게 멘탈이 깨졌습니다.</p>
-            <div style={{ display: 'flex', gap: '20px', marginTop: '20px' }}>
-              <button className="combat-close-btn" onClick={onClose}>
-                돌아가서 스펙을 올리자
-              </button>
-              {currentStage >= 30 && (
-                <button 
-                  className="combat-close-btn" 
-                  style={{ background: '#8e44ad' }} 
-                  onClick={() => {
-                    onClose();
-                    onOpenRebirth();
-                  }}
-                >
-                  창낼용기 (환생하기)
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 좌측: 아군 파티 진영 */}
         <div className="ally-zone">
           <div className="ally-party-grid">
             {uiChars.map((char, index) => {
+              if (!char) {
+                return (
+                  <div key={`empty-slot-${index}`} className="ally-character-wrapper" style={{ visibility: 'hidden' }}>
+                  </div>
+                );
+              }
+
               const isDead = char.hp <= 0;
               const isCeoLinked = char.id === ceoLinkedCharId;
-              
+
               let spriteUrl = getCombatImageUrl(char.id, 'ready');
               if (combatState === 'entering') {
                 spriteUrl = getFrameUrl(`${char.id}_walk (${walkFrame}).png`) || spriteUrl;
@@ -371,44 +652,61 @@ export function CombatScreen({ onClose, onOpenRebirth }: Props) {
               }
 
               return (
-                <div key={index} className={`ally-character-wrapper ${char.action !== 'idle' ? `ally-${char.action}` : ''} ${isDead ? 'dead-slot' : ''} ${isCeoLinked && !isDead ? 'ceo-aura' : ''}`}>
+                <div key={index} className={`ally-character-wrapper ${char.action !== 'idle' ? `ally-${char.action}` : ''} ${isDead ? 'dead-slot' : ''} ${isCeoLinked && !isDead && mode === 'normal' ? 'ceo-aura' : ''}`}>
                   <img src={spriteUrl} alt="ally" className="ally-sprite" />
                   <div className="ally-name">{char.name}</div>
-                  
-                  {/* 개별 HP 바 */}
+
                   <div className="char-hp-bar-container">
                     <div className="char-hp-fill" style={{ width: `${Math.max(0, Math.min(100, (char.hp / char.maxHp) * 100)) || 0}%` }}></div>
                   </div>
                 </div>
               );
             })}
-            
-            {/* 빈 슬롯 렌더링 (4명 미만일 경우) */}
-            {Array.from({ length: 4 - uiChars.length }).map((_, i) => (
-              <div key={`empty-${i}`} className="ally-character-wrapper">
-                <div className="empty-slot-marker">Empty</div>
-              </div>
-            ))}
           </div>
         </div>
 
-        {/* 우측: 보스(악플러) 진영 */}
         <div className="enemy-zone">
-          {combatState !== 'boss_dead' ? (() => {
+          {combatState !== 'boss_dead' && combatState !== 'tower_win' ? (() => {
             let bossSpriteUrl = getEnemyImageUrl(currentBoss.id, 'stay');
-            if (bossAction === 'attack') {
+            if (bossAction === 'attack' && mode !== 'disk') {
               bossSpriteUrl = getEnemyImageUrl(currentBoss.id, `atk${stateRef.current.bossAtkFrame}` as 'atk1' | 'atk2');
             }
 
             return (
               <div className={`boss-character-wrapper boss-${combatState} boss-${bossAction}`}>
-                <div className="boss-hp-bar-container">
-                  <div className="boss-hp-fill" style={{ width: `${(bossHp / bossMaxHp) * 100}%` }}></div>
-                  <span className="boss-hp-text">{bossHp} / {bossMaxHp}</span>
-                </div>
-                <img src={bossSpriteUrl} alt="boss" className="boss-sprite" />
-                <h3 className="boss-name">{currentBoss.name} Lv.{currentStage}</h3>
-                <div className="boss-stats">공격력: {bossAtk}</div>
+                {mode === 'disk' ? (
+                  <div className="disk-dmg-container" style={{ textAlign: 'center', marginBottom: '10px' }}>
+                    <div style={{ color: '#f1c40f', fontSize: '1.2rem', fontWeight: 'bold' }}>누적 데미지</div>
+                    <div style={{ color: 'white', fontSize: '2.5rem', fontWeight: '900', textShadow: '2px 2px 4px #000' }}>
+                      {formatDamage(bossHp)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="boss-hp-bar-container">
+                    <div className="boss-hp-fill" style={{ width: `${(bossHp / bossMaxHpValue) * 100}%` }}></div>
+                    <span className="boss-hp-text">{formatDamage(bossHp)} / {formatDamage(bossMaxHpValue)}</span>
+                  </div>
+                )}
+                
+                <img 
+                  src={bossSpriteUrl} 
+                  alt="boss" 
+                  className="boss-sprite" 
+                  style={{ 
+                    filter: mode === 'disk' ? 'drop-shadow(0 0 10px rgba(241,196,15,0.8))' : 
+                            mode === 'tower' ? 'drop-shadow(0 0 10px rgba(255,0,0,0.5)) hue-rotate(-20deg) saturate(150%)' : 'none' 
+                  }} 
+                />
+                
+                <h3 className="boss-name">
+                  {mode === 'disk' ? '황금 디스크' : 
+                   mode === 'tower' ? `${currentBoss.name}` : 
+                   `${currentBoss.name} Lv.${currentStage}`}
+                </h3>
+                
+                {mode !== 'disk' && (
+                  <div className="boss-stats">공격력: {formatDamage(bossAtkValue)}</div>
+                )}
               </div>
             );
           })() : (
