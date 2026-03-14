@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useGameStore, getEffectiveStats, getTierMultiplier, getHpMultiplier } from '../store/gameStore';
 import { CHARACTER_DATA } from '../data/characters';
 import { getCombatImageUrl, getFrameUrl, getEnemyImageUrl } from '../utils/assets';
+import * as TAT_EQUIP_DATA from '../data/tatEquipData';
 import skill1Image from '../assets/images/skill1.png';
 import './CombatScreen.css';
 
@@ -58,7 +59,8 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
   const { 
     combatParty, currentStage, ownedCharacters, nextStage, ceoLinkedCharId, permanentBuffs, 
     bossSkillUnlocked, bossSkillCooldownEnd, maxDiskDamage, finishGoldenDisk,
-    towerFloor, towerSlots, towerSlotLevels, towerArtifacts, finishTowerFloor
+    towerFloor, towerSlots, towerSlotLevels, towerArtifacts, finishTowerFloor,
+    tatEquips
   } = gameState;
 
   const [currentTime, setCurrentTime] = useState(Date.now());
@@ -152,8 +154,12 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
     const mic = towerArtifacts.find(a => a.id === 'mic');
     const lightstick = towerArtifacts.find(a => a.id === 'lightstick');
     
-    const atkMult = 1 + (mic ? mic.level * 0.2 : 0);
-    const hpMultGlobal = 1 + (lightstick ? lightstick.level * 0.3 : 0);
+    // 탓 장비 보너스 가져오기
+    const equip1Bonus = TAT_EQUIP_DATA.EQUIP1_ATK_BONUS[tatEquips.equip1.level] || 0;
+    const equip2Bonus = TAT_EQUIP_DATA.EQUIP2_HP_BONUS[tatEquips.equip2.level] || 0;
+
+    const atkMult = (1 + (mic ? mic.level * 0.2 : 0)) * (1 + equip1Bonus / 100);
+    const hpMultGlobal = (1 + (lightstick ? lightstick.level * 0.3 : 0)) * (1 + equip2Bonus / 100);
 
     if (mode === 'tower') {
       charsData = towerSlots.map((slot, index) => {
@@ -164,8 +170,8 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
         let cAspd = slot.aspd;
 
         const level = towerSlotLevels[index];
-        if (index === 0) cHp *= (1 + (level * 0.2));
-        if (index === 1 || index === 2) cAtk *= (1 + (level * 0.15));
+        if (index === 1 || index === 3) cHp *= (1 + (level * 0.2));
+        if (index === 0 || index === 2) cAtk *= (1 + (level * 0.15));
         if (index === 3) cAspd *= (1 + (level * 0.05));
 
         return {
@@ -203,7 +209,7 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
 
         let cMaxHp = Math.floor((200 + s.charm * 80) * rebirthMult * hpMult);
         let cAtk = Math.floor(baseAtk * rebirthMult * tierMult);
-        let cAspd = 0.8 + (Math.log10(s.dance + 10) * 0.2);
+        let cAspd = (0.8 + (Math.log10(s.dance + 10) * 0.2)) * (1 + (gameState.advancedBuffs.namTatAspdBoostLevel * 0.1));
 
         const level = towerSlotLevels[index];
         if (index === 0) cMaxHp *= (1 + (level * 0.2));
@@ -324,6 +330,8 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
       // 억까 당한 탓: 극크리 개방
       const hyperCritLevel = useGameStore.getState().advancedBuffs.namTatHyperCritLevel || 0;
       const hyperCritChance = hyperCritLevel * 0.05; // 레벨당 5%
+      
+      const equip3Bonus = TAT_EQUIP_DATA.EQUIP3_CRIT_BONUS[useGameStore.getState().tatEquips.equip3.level] || 0;
 
       st.chars.forEach(char => {
         if (!char) return;
@@ -353,10 +361,12 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
               
               // 극크리 판정 (초크리가 터졌을 때만 굴림)
               if (hyperCritChance > 0 && Math.random() < hyperCritChance) {
-                 dmg *= 3.0; // 3배 증폭
+                 const hyperCritMult = 3.0 * (1 + equip3Bonus / 100);
+                 dmg *= hyperCritMult; // 3배 증폭 (기본) + 탓 장비 배율
                  dmgType = 'hypercrit';
               }
             }
+            
             char.action = 'burst';
             char.animTimer = 0.3;
           } else {
@@ -460,6 +470,7 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
           if (nextTime <= 0) {
             st.isFighting = false;
             setCombatState('disk_end');
+            useGameStore.getState().consumeDiskTicket(); // 티켓 차감
             finishGoldenDisk(st.bossHp);
             return 0;
           }
@@ -605,16 +616,12 @@ export function CombatScreen({ mode, onClose, onOpenRebirth }: Props) {
           <div style={{ fontSize: '1.5rem', color: 'white', margin: '20px 0', display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
             <div>이번 누적 데미지: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{formatDamage(diskAccumulatedDmg)}</span></div>
             <div>이전 최고 기록: <span style={{ color: '#aaa' }}>{formatDamage(initialMaxDiskDamage)}</span></div>
-            {diskAccumulatedDmg > initialMaxDiskDamage ? (
-              <>
-                <div style={{ color: '#2ecc71', fontWeight: 'bold', fontSize: '1.8rem', marginTop: '10px' }}>기록 갱신! 🎉</div>
-                <div style={{ fontSize: '1.2rem' }}>
-                  획득한 음표: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>🎵 {Math.floor((diskAccumulatedDmg - initialMaxDiskDamage) / 10000).toLocaleString()}</span> 개
-                </div>
-              </>
-            ) : (
-              <div style={{ color: '#e74c3c', fontWeight: 'bold', marginTop: '10px' }}>기록 갱신 실패...</div>
-            )}
+            <div style={{ color: '#2ecc71', fontWeight: 'bold', fontSize: '1.8rem', marginTop: '10px' }}>
+              {diskAccumulatedDmg > initialMaxDiskDamage ? '기록 갱신! 🎉' : '보상 획득 완료!'}
+            </div>
+            <div style={{ fontSize: '1.2rem' }}>
+              획득한 음표: <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>🎵 {Math.floor(diskAccumulatedDmg / 10000).toLocaleString()}</span> 개
+            </div>
           </div>
           <button className="combat-close-btn" style={{ marginTop: '30px', fontSize: '1.2rem', padding: '15px 30px' }} onClick={onClose}>
             사옥으로 돌아가기

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore, getTierMultiplier, getEffectiveStats, getHpMultiplier } from '../store/gameStore';
 import { CHARACTER_DATA } from '../data/characters';
 import { getCardImageUrl } from '../utils/assets';
@@ -11,8 +11,12 @@ interface Props {
 }
 
 export function PartySetupModal({ onClose, onStartCombat, onShowToast }: Props) {
-  const { ownedCharacters, combatParty, setCombatParty, currentStage } = useGameStore();
-  
+  const { ownedCharacters, combatParty, setCombatParty, currentStage, diskTickets, checkDailyReset } = useGameStore();
+
+  useEffect(() => {
+    checkDailyReset();
+  }, [checkDailyReset]);
+
   // 슬롯 기반(4칸 고정) 파티 상태
   const [localParty, setLocalParty] = useState<(string | null)[]>(() => {
     const arr: (string | null)[] = [null, null, null, null];
@@ -73,6 +77,12 @@ const handleConfirm = () => {
     onShowToast('최소 1명은 배치해야 합니다.');
     return;
   }
+  if (combatMode === 'disk') {
+    if (useGameStore.getState().diskTickets <= 0) {
+      onShowToast('오늘의 디스크 방 입장권을 모두 소진했습니다.');
+      return;
+    }
+  }
   setCombatParty(finalParty);
   onStartCombat(combatMode);
 };
@@ -89,7 +99,7 @@ return (
               <h3 style={{ margin: 0 }}>배치도</h3>
               <div className="info-tooltip-wrapper" style={{ marginBottom: '2px' }}>
                 <span className="info-icon" style={{ fontSize: '1rem' }}>❓</span>
-                <div className="info-tooltip" style={{ top: '100%', left: '0', transform: 'none', marginLeft: '20px', marginTop: '10px' }}>
+                <div className="info-tooltip" style={{ width: '300px', top: '100%', left: '0', transform: 'none', marginLeft: '0px', marginTop: '10px', textAlign: 'left' }}>
                   보스의 공격은 전열(앞쪽 2명)에 집중될 확률이 훨씬 높습니다. (약 3배)<br/>
                   체력(매력)이 높은 사원을 전열에 배치하여 후열의 딜러를 보호하세요!
                 </div>
@@ -169,13 +179,15 @@ return (
                   onClick={() => {
                     if (currentStage < 60) {
                       onShowToast('황금 디스크의 방은 스테이지 60 이상부터 진입 가능합니다.');
+                    } else if (useGameStore.getState().diskTickets <= 0) {
+                      onShowToast('오늘의 입장권을 모두 소진했습니다.');
                     } else {
                       setCombatMode('disk');
                     }
                   }}
-                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: combatMode === 'disk' ? '2px solid #f1c40f' : '2px solid #555', background: combatMode === 'disk' ? 'rgba(241, 196, 15, 0.2)' : '#333', color: currentStage >= 60 ? 'white' : '#888', cursor: currentStage >= 60 ? 'pointer' : 'not-allowed', fontWeight: 'bold' }}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: combatMode === 'disk' ? '2px solid #f1c40f' : '2px solid #555', background: combatMode === 'disk' ? 'rgba(241, 196, 15, 0.2)' : '#333', color: currentStage >= 60 && useGameStore.getState().diskTickets > 0 ? 'white' : '#888', cursor: currentStage >= 60 && useGameStore.getState().diskTickets > 0 ? 'pointer' : 'not-allowed', fontWeight: 'bold' }}
                 >
-                  {currentStage >= 60 ? '💿 디스크 방' : '🔒 디스크 방 (St.60)'}
+                  {currentStage >= 60 ? `💿 디스크 방 (${diskTickets}/3)` : '🔒 디스크 방 (St.60)'}
                 </button>
               </div>
               <button className="start-combat-btn" onClick={handleConfirm}>

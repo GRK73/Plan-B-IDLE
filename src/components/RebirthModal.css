@@ -154,11 +154,10 @@
   font-size: 0.85rem;
   color: #ccc;
   line-height: 1.5;
-  margin-bottom: 15px;
-  flex: 1;
+  margin-bottom: 5px;
+  height: 65px;
   overflow-y: auto;
-  min-height: 0;
-  padding: 0 5px;
+  padding: 0 5px 15px 5px;
   text-align: left;
 }
 
@@ -174,8 +173,12 @@
   display: flex;
   justify-content: space-between;
   margin-bottom: 10px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   align-items: center;
+}
+.stat-row span:last-child {
+  white-space: nowrap;
+  margin-left: 10px;
 }
 .stat-row:last-child {
   margin-bottom: 0;
@@ -217,4 +220,205 @@
   background: #555;
   color: #888;
   cursor: not-allowed;
+}
+
+/* 탓 장비 탭 스타일 */
+.equip-tab-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-right: 15px;
+}
+.equip-tab-content::-webkit-scrollbar {
+  width: 6px;
+}
+.equip-tab-content::-webkit-scrollbar-thumb {
+  background: #5a2e98;
+  border-radius: 4px;
+}
+
+.equip-notice {
+  background: rgba(241, 196, 15, 0.15);
+  border: 1px solid #f1c40f;
+  color: #f1c40f;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+  margin-bottom: 15px;
+  font-weight: bold;
+  font-size: 0.95rem;
+}
+
+.equip-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.equip-card {
+  display: flex;
+  background: rgba(0,0,0,0.5);
+  border: 2px solid #555;
+  border-radius: 12px;
+  padding: 15px;
+  gap: 20px;
+  align-items: center;
+}
+
+.equip-card-image-box {
+  width: 100px;
+  height: 100px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  border: 1px solid #444;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.equip-img {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
+  transition: all 0.2s;
+  will-change: transform;
+}
+
+.equip-level-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #f1c40f;
+  color: #000;
+  font-weight: bold;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
+.equip-card-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.equip-name {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #e67e22;
+  margin-bottom: 10px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+.equip-unlock-area, .equip-enhance-area {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.equip-stats {
+  font-size: 0.95rem;
+  color: #ccc;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stat-val {
+  color: #bdc3c7;
+  font-weight: bold;
+}
+
+.stat-val-next {
+  color: #2ecc71;
+  font-weight: bold;
+}
+
+.equip-probs {
+  font-size: 0.85rem;
+  color: #888;
+}
+.prob-s { color: #2ecc71; font-weight: bold; }
+.prob-k { color: #aaa; }
+.prob-d { color: #e74c3c; font-weight: bold; }
+
+.equip-btn {
+  padding: 10px 15px;
+  font-size: 1rem;
+  font-weight: bold;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #34495e;
+  transition: filter 0.2s, transform 0.1s;
+  margin-top: 5px;
+}
+
+.equip-btn.unlock {
+  background: #8e44ad;
+}
+
+.equip-btn.enhance {
+  background: #27ae60;
+}
+
+.equip-btn.enhance:disabled {
+  background: #555;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.equip-btn:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+
+.equip-btn:active:not(:disabled) {
+  transform: translateY(2px);
+}
+
+/* Animations */
+@keyframes shakeEquip {
+  0% { transform: rotate(0deg) scale(1.1); }
+  25% { transform: rotate(5deg) scale(1.1); }
+  50% { transform: rotate(0eg) scale(1.1); }
+  75% { transform: rotate(-5deg) scale(1.1); }
+  100% { transform: rotate(0deg) scale(1.1); }
+}
+
+@keyframes equipSuccessBounce {
+  0% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.5); filter: brightness(2) drop-shadow(0 0 15px #f1c40f); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes equipDropFlash {
+  0% { filter: grayscale(100%); }
+  50% { filter: grayscale(100%) brightness(0.5); }
+  100% { filter: grayscale(0%); }
+}
+
+@keyframes equipCardDropFlash {
+  0%, 100% { border-color: #555; }
+  50% { border-color: #e74c3c; box-shadow: inset 0 0 20px rgba(231,76,60,0.4); }
+}
+
+.equip-anim-shake {
+  animation: shakeEquip 0.15s infinite;
+}
+
+.equip-anim-success {
+  animation: equipSuccessBounce 0.6s ease-out forwards;
+}
+
+.equip-anim-drop {
+  animation: equipDropFlash 0.6s ease-out forwards;
+}
+
+.equip-card:has(.equip-anim-drop) {
+  animation: equipCardDropFlash 0.6s ease-out forwards;
 }

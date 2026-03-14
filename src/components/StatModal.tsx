@@ -36,20 +36,29 @@ export function StatModal({ charId, onClose, onShowToast, onOpenConfirm }: Props
   // 카드 확대 상태
   const [isCardExpanded, setIsCardExpanded] = useState(false);
 
-  // 꾹 누르기 상태 관리
-  const holdIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 꾹 누르기 상태 관리 (가속 기능 추가)
+  const holdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdSpeedRef = useRef<number>(150); // 초기 속도 (ms)
 
   const startHoldAction = (action: () => void) => {
-    action();
-    holdIntervalRef.current = setInterval(() => {
+    action(); // 최초 1회 즉시 실행
+    holdSpeedRef.current = 150; // 초기 속도 리셋
+
+    const loop = () => {
       action();
-    }, 100); // 0.1초마다 실행
+      // 속도 가속: 최소 10ms까지 점점 빨라짐
+      holdSpeedRef.current = Math.max(10, holdSpeedRef.current * 0.85);
+      holdTimeoutRef.current = setTimeout(loop, holdSpeedRef.current);
+    };
+
+    // 0.3초(300ms) 동안 누르고 있으면 연속 실행 시작
+    holdTimeoutRef.current = setTimeout(loop, 300);
   };
 
   const stopHoldAction = () => {
-    if (holdIntervalRef.current) {
-      clearInterval(holdIntervalRef.current);
-      holdIntervalRef.current = null;
+    if (holdTimeoutRef.current) {
+      clearTimeout(holdTimeoutRef.current);
+      holdTimeoutRef.current = null;
     }
   };
 
@@ -120,7 +129,7 @@ export function StatModal({ charId, onClose, onShowToast, onOpenConfirm }: Props
   const cAtk = Math.floor(baseAtk * rebirthMult * tierMult);
   const cCritChance = Math.min((s.sense * 1), 50 + (useGameStore.getState().permanentBuffs.ruleBreakerLevel * 5));
   const cCritMult = (1.5 + Math.log10(s.rap + 10) * 0.3 + (useGameStore.getState().permanentBuffs.ruleBreakerLevel * 0.5)) * 100;
-  const cAspd = 0.8 + (Math.log10(s.dance + 10) * 0.2);
+  const cAspd = (0.8 + (Math.log10(s.dance + 10) * 0.2)) * (1 + (useGameStore.getState().advancedBuffs.namTatAspdBoostLevel * 0.1));
   const cHp = Math.floor((200 + s.charm * 80) * rebirthMult * hpMult);
 
   return (

@@ -1,7 +1,7 @@
 // src/utils/leaderboardApi.ts
 
 // The public CSV URL for reading the leaderboard data
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT5VdIRH9XKBagHI-SyRXRZ5_y0qcmCXmeYqpihp78NeQpldb7-Ch5pIz8pNhVi_k6uKeLjfLQSJ1yl/pub?gid=0&single=true&output=csv";
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT5VdIRH9XKBagHI-SyRXRZ5_y0qcmCXmeYqpihp78NeQpldb7-Ch5pIz8pNhVi_k6uKeLjfLQSJ1yl/pub?gid=1410995490&single=true&output=csv";
 
 // The Google Apps Script Web App URL for submitting scores (POST)
 const POST_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwoOXupPaTSpAO3VkbaYCIvU8T7IGlzQJwYFoKUzbEPNAjwmGTAeTrwqOcuiZYif-sRPg/exec";

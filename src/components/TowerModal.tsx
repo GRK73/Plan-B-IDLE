@@ -58,6 +58,10 @@ export function TowerModal({ onClose, onStartTowerCombat, onShowToast }: Props) 
 
   const handleSaveSlot = (charId: string) => {
     if (selectingSlot !== null) {
+      if (towerSlots.some((slot, idx) => idx !== selectingSlot && slot?.id === charId)) {
+        onShowToast('이미 다른 슬롯에 배치된 사원입니다.');
+        return;
+      }
       saveToTowerSlot(selectingSlot, charId);
       onShowToast(`${selectingSlot + 1}번 슬롯에 스냅샷을 저장했습니다!`);
       setSelectingSlot(null);
@@ -96,7 +100,18 @@ export function TowerModal({ onClose, onStartTowerCombat, onShowToast }: Props) 
     <div className="tower-modal-overlay">
       <div className="tower-modal-content">
         <div className="tower-header">
-          <h2>최강자의 탑</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 style={{ margin: 0 }}>최강자의 탑</h2>
+            <div className="info-tooltip-wrapper" style={{ marginBottom: '2px' }}>
+              <span className="info-icon" style={{ fontSize: '1.2rem' }}>❓</span>
+              <div className="info-tooltip" style={{ width: '400px', top: '100%', left: '0', transform: 'none', marginLeft: '0px', marginTop: '10px', textAlign: 'left', zIndex: 300 }}>
+                <strong>[최강자의 탑 가이드]</strong><br/>
+                1. <strong>스냅샷 박제:</strong> 사원들의 현재 스펙(버프 포함)을 탑 슬롯에 영구 기록합니다. (환생해도 유지됨!)<br/>
+                2. <strong>자리 오버클럭:</strong> 파편을 모아 슬롯 자체를 강화하면 배치된 사원의 능력이 증폭됩니다.<br/>
+                3. <strong>유물 파밍:</strong> 5층마다 보스를 처치하고 획득하는 유물은 모든 콘텐츠에 강력한 영구 버프를 제공합니다.
+              </div>
+            </div>
+          </div>
           <button className="tower-close-btn" onClick={onClose}>닫기</button>
         </div>
 
@@ -129,6 +144,33 @@ export function TowerModal({ onClose, onStartTowerCombat, onShowToast }: Props) 
                 <div className="tower-slots-container">
                   {towerSlots.map((slot, idx) => {
                     const roleText = (idx === 1 || idx === 3) ? '전열 (HP 집중)' : '후열 (딜러)';
+                    
+                    let displayAtk = 0;
+                    let displayHp = 0;
+                    
+                    if (slot) {
+                      const mic = towerArtifacts.find(a => a.id === 'mic');
+                      const lightstick = towerArtifacts.find(a => a.id === 'lightstick');
+                      const equip1Bonus = useGameStore.getState().tatEquips ? window.TAT_EQUIP_DATA.EQUIP1_ATK_BONUS[useGameStore.getState().tatEquips.equip1.level] || 0 : 0;
+                      const equip2Bonus = useGameStore.getState().tatEquips ? window.TAT_EQUIP_DATA.EQUIP2_HP_BONUS[useGameStore.getState().tatEquips.equip2.level] || 0 : 0;
+
+                      const atkMult = (1 + (mic ? mic.level * 0.2 : 0)) * (1 + equip1Bonus / 100);
+                      const hpMultGlobal = (1 + (lightstick ? lightstick.level * 0.3 : 0)) * (1 + equip2Bonus / 100);
+
+                      let cHp = slot.maxHp;
+                      let cAtk = slot.atk;
+                      const level = towerSlotLevels[idx];
+
+                      if (idx === 1 || idx === 3) cHp *= (1 + (level * 0.2));
+                      if (idx === 0 || idx === 2) cAtk *= (1 + (level * 0.15));
+
+                      cHp = Math.floor(cHp * hpMultGlobal);
+                      cAtk = Math.floor(cAtk * atkMult);
+
+                      displayAtk = Math.floor(cAtk * (1 - slot.burstChance) + (cAtk * slot.burstMult * slot.burstChance));
+                      displayHp = cHp;
+                    }
+
                     return (
                       <div key={idx} className={`tower-slot ${slot ? 'filled' : 'empty'}`} onClick={() => setSelectingSlot(idx)}>
                         <div className="tower-slot-role">
@@ -140,8 +182,8 @@ export function TowerModal({ onClose, onStartTowerCombat, onShowToast }: Props) 
                             <img src={getCombatImageUrl(slot.id, 'ready')} alt="char" className="tower-slot-char-img" />
                             <div className="tower-slot-info">
                               <div style={{ color: '#f1c40f', fontWeight: 'bold' }}>{slot.name}</div>
-                              <div>ATK: {formatDamage(Math.floor(slot.atk * (1 - slot.burstChance) + (slot.atk * slot.burstMult * slot.burstChance)))}</div>
-                              <div>HP: {formatDamage(slot.maxHp)}</div>
+                              <div>ATK: {formatDamage(displayAtk)}</div>
+                              <div>HP: {formatDamage(displayHp)}</div>
                             </div>
                           </>
                         ) : (

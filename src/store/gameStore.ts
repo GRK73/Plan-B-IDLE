@@ -1,7 +1,16 @@
 import { create } from 'zustand';
 import { BaseDirectory, readTextFile, writeTextFile, exists, mkdir } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import { CHARACTER_DATA } from '../data/characters';
 import { submitScore } from '../utils/leaderboardApi';
+import * as TAT_EQUIP_DATA from '../data/tatEquipData';
+
+declare global {
+  interface Window {
+    TAT_EQUIP_DATA: typeof TAT_EQUIP_DATA;
+  }
+}
+window.TAT_EQUIP_DATA = TAT_EQUIP_DATA;
 
 export interface Stats {
   vocal: number;
@@ -60,6 +69,18 @@ export interface TowerArtifact {
   maxLevel: number;
 }
 
+export interface TatEquip {
+  unlocked: boolean;
+  level: number;
+}
+
+export interface TatEquips {
+  equip1: TatEquip; // 무기
+  equip2: TatEquip; // 방어구
+  equip3: TatEquip; // 장신구
+  equip4: TatEquip; // 사원증
+}
+
 interface GameState {
   poong: number;
   tat: number; // 환생 재화 '탓'
@@ -68,6 +89,10 @@ interface GameState {
   musicalNotes: number; // 황금 디스크 방 재화 '음표'
   maxDiskDamage: number; // 황금 디스크 방 최고 기록
   diskBuffs: Stats; // 황금 디스크 방 스탯별 버프 레벨
+  diskTickets: number; // 디스크 방 남은 입장권
+  diskLastDate: string; // 디스크 방 마지막 플레이 날짜
+
+  tatEquips: TatEquips; // 탓 장비 상태
 
   permanentBuffs: PermanentBuffs;
   advancedBuffs: AdvancedBuffs;
@@ -135,6 +160,12 @@ interface GameState {
   // 디스크 방 Actions
   finishGoldenDisk: (totalDamage: number) => void;
   upgradeDiskBuff: (statType: keyof Stats) => void;
+  checkDailyReset: () => Promise<void>;
+  consumeDiskTicket: () => boolean;
+
+  // 탓 장비 Actions
+  unlockTatEquip: (equipIndex: 1 | 2 | 3 | 4) => void;
+  upgradeTatEquip: (equipIndex: 1 | 2 | 3 | 4, successStr: 's' | 'm' | 'd') => void;
 
   // 탑 Actions
   saveToTowerSlot: (slotIndex: number, charId: string) => void;
@@ -211,12 +242,16 @@ export const getEffectiveStats = (state: GameState, charId: string): Stats => {
   // 환생 버프 곱연산 적용을 제외한 "순수 스탯 합산치"만 넘깁니다. 
   // 등급별 배율(TierMultiplier)은 여기서 바로 곱하지 않고, TPS나 전투 데미지를 계산하는 최상위(최종) 단계에서만 곱해야 체급 차이가 부각됩니다.
   // 디스크 버프는 여기서 %로 스탯 체급 자체를 뻥튀기합니다 (1레벨당 10%).
+  // 사원증(equip4)은 여기서 5대 스탯 베이스 체급을 % 단위로 추가 뻥튀기합니다.
+  
+  const equip4Bonus = window.TAT_EQUIP_DATA ? window.TAT_EQUIP_DATA.EQUIP4_STAT_BONUS[state.tatEquips.equip4.level] || 0 : 0;
+  
   return {
-    vocal: Math.floor(stats.vocal * (1 + state.diskBuffs.vocal * 0.10)),
-    rap: Math.floor(stats.rap * (1 + state.diskBuffs.rap * 0.10)),
-    dance: Math.floor(stats.dance * (1 + state.diskBuffs.dance * 0.10)),
-    sense: Math.floor(stats.sense * (1 + state.diskBuffs.sense * 0.10)),
-    charm: Math.floor(stats.charm * (1 + state.diskBuffs.charm * 0.10)),
+    vocal: Math.floor(stats.vocal * (1 + state.diskBuffs.vocal * 0.10) * (1 + equip4Bonus / 100)),
+    rap: Math.floor(stats.rap * (1 + state.diskBuffs.rap * 0.10) * (1 + equip4Bonus / 100)),
+    dance: Math.floor(stats.dance * (1 + state.diskBuffs.dance * 0.10) * (1 + equip4Bonus / 100)),
+    sense: Math.floor(stats.sense * (1 + state.diskBuffs.sense * 0.10) * (1 + equip4Bonus / 100)),
+    charm: Math.floor(stats.charm * (1 + state.diskBuffs.charm * 0.10) * (1 + equip4Bonus / 100)),
   };
 };
 
@@ -270,6 +305,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   musicalNotes: 0,
   maxDiskDamage: 0,
   diskBuffs: { vocal: 0, rap: 0, dance: 0, sense: 0, charm: 0 },
+  diskTickets: 3,
+  diskLastDate: '',
+  
+  tatEquips: {
+    equip1: { unlocked: false, level: 0 },
+    equip2: { unlocked: false, level: 0 },
+    equip3: { unlocked: false, level: 0 },
+    equip4: { unlocked: false, level: 0 },
+  },
   
   towerFloor: 1,
   towerFragments: 0,
@@ -411,10 +455,10 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     const earnedTat = (state.currentStage - 30) * 10;
     
-    // 100스테이지 초과 시 남탓 획득 (예: 100층에서 1개, 105층에서 2개 등)
+    // 100스테이지 초과 시 남탓 획득 (예: 101층에서 10개, 105층에서 50개 등)
     let earnedNamTat = 0;
     if (state.currentStage > 100) {
-      earnedNamTat = Math.floor((state.currentStage - 90) / 10);
+      earnedNamTat = Math.floor((state.currentStage - 100) * 10);
     }
 
     // 비동기로 리더보드에 점수 제출 (닉네임이 있을 경우에만)
@@ -524,19 +568,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     switch (buffName) {
       case 'namTatGachaDiscountLevel':
         if (currentLevel >= 10) return state; // 최대 10레벨 (50%)
-        cost = 1 + currentLevel * 2;
+        cost = 10 + currentLevel * 20;
         break;
       case 'namTatAspdBoostLevel':
-        cost = 2 + currentLevel * 3;
+        cost = 20 + currentLevel * 30;
         break;
       case 'namTatTpsBoostLevel':
-        cost = 5 + currentLevel * 5;
+        cost = 50 + currentLevel * 50;
         break;
       case 'namTatHyperCritLevel':
-        cost = 10 + currentLevel * 10;
+        cost = 100 + currentLevel * 100;
         break;
       case 'namTatDiskTimeLevel':
-        cost = 3 + currentLevel * 3;
+        cost = 30 + currentLevel * 30;
         break;
     }
 
@@ -551,16 +595,45 @@ export const useGameStore = create<GameState>((set, get) => ({
   }),
 
   finishGoldenDisk: (totalDamage) => set((state) => {
-    if (totalDamage > state.maxDiskDamage) {
-      const diff = totalDamage - state.maxDiskDamage;
-      const notesEarned = Math.floor(diff / 10000);
-      return {
-        maxDiskDamage: totalDamage,
-        musicalNotes: state.musicalNotes + notesEarned
-      };
-    }
-    return state;
+    const notesEarned = Math.floor(totalDamage / 10000);
+    const maxDiskDamage = Math.max(state.maxDiskDamage, totalDamage);
+    return {
+      maxDiskDamage,
+      musicalNotes: state.musicalNotes + notesEarned
+    };
   }),
+
+  checkDailyReset: async () => {
+    try {
+      let dateStr = await invoke<string>("get_server_time");
+      if (!dateStr) {
+        // Fallback to local time (KST offset +9 hours)
+        const now = new Date(Date.now() + 9 * 60 * 60 * 1000);
+        dateStr = now.toISOString().split('T')[0];
+      }
+
+      const state = get();
+      if (state.diskLastDate !== dateStr) {
+        set({
+          diskTickets: 3,
+          diskLastDate: dateStr
+        });
+        await get().saveGame();
+      }
+    } catch (e) {
+      console.error("Failed to check daily reset:", e);
+    }
+  },
+
+  consumeDiskTicket: () => {
+    const state = get();
+    if (state.diskTickets > 0) {
+      set({ diskTickets: state.diskTickets - 1 });
+      get().saveGame(); // Save immediately to prevent refresh abuse
+      return true;
+    }
+    return false;
+  },
 
   upgradeDiskBuff: (statType) => {
     set((state) => {
@@ -577,6 +650,54 @@ export const useGameStore = create<GameState>((set, get) => ({
         };
       }
       return state;
+    });
+    get().calculateTps();
+  },
+
+  // 탓 장비 Actions
+  unlockTatEquip: (equipIndex) => set((state) => {
+    const cost = window.TAT_EQUIP_DATA ? window.TAT_EQUIP_DATA.TAT_EQUIP_UNLOCK_COST : 1000;
+    if (state.tat < cost) return state;
+
+    const key = `equip${equipIndex}` as keyof TatEquips;
+    const currentEquip = state.tatEquips[key];
+    if (currentEquip.unlocked) return state;
+
+    return {
+      tat: state.tat - cost,
+      tatEquips: {
+        ...state.tatEquips,
+        [key]: { ...currentEquip, unlocked: true }
+      }
+    };
+  }),
+
+  upgradeTatEquip: (equipIndex, successStr) => {
+    set((state) => {
+      const cost = window.TAT_EQUIP_DATA ? window.TAT_EQUIP_DATA.TAT_EQUIP_ENHANCE_COST : 150;
+      if (state.tat < cost) return state;
+
+      const key = `equip${equipIndex}` as keyof TatEquips;
+      const currentEquip = state.tatEquips[key];
+      
+      if (!currentEquip.unlocked) return state;
+      if (currentEquip.level >= 30) return state;
+
+      let nextLevel = currentEquip.level;
+      if (successStr === 's') {
+        nextLevel++;
+      } else if (successStr === 'd') {
+        nextLevel--;
+      }
+      // 'm' (maintain)인 경우 변동 없음
+
+      return {
+        tat: state.tat - cost,
+        tatEquips: {
+          ...state.tatEquips,
+          [key]: { ...currentEquip, level: nextLevel }
+        }
+      };
     });
     get().calculateTps();
   },

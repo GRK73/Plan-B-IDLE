@@ -34,6 +34,8 @@ Zustand를 사용하여 게임의 핵심 데이터와 비즈니스 로직을 관
 * **`setNickname(name)`**: 사용자의 닉네임을 전역 상태에 저장합니다.
 * **`buyBuff(buffName)`**: 탓을 소모하여 영구적인 스펙(PermanentBuffs)을 구매합니다.
 * **`buyAdvancedBuff(buffName)`**: 남탓을 소모하여 극후반 전용 심화 특성(AdvancedBuffs)을 구매합니다.
+* **`unlockTatEquip(equipIndex)`**: 탓을 소모하여 특정 탓 장비를 해금합니다.
+* **`upgradeTatEquip(equipIndex, successStr)`**: 탓을 소모하여 특정 탓 장비를 강화합니다. (확률에 따라 성공/유지/하락 처리)
 * **`finishGoldenDisk(totalDamage)`**: 황금 디스크 방 전투 종료 시 호출되며, 최고 기록을 경신할 경우 차액만큼의 **음표(Musical Notes)** 재화를 획득합니다.
 * **`upgradeDiskBuff(statType)`**: 음표를 소모하여 사원 전체의 기초 스탯을 영구적으로 % 단위로 뻥튀기합니다.
 * **`saveToTowerSlot(slotIndex, charId)`**: 현재 파티원의 강력한 상태(스냅샷)를 탑 슬롯에 박제합니다.
@@ -57,7 +59,7 @@ Zustand를 사용하여 게임의 핵심 데이터와 비즈니스 로직을 관
 * **`StatModal.tsx`**: 개별 사원의 상세 정보 확인 및 스탯 투자를 진행하는 창입니다.
 * **`CollectionModal.tsx`**: 보유 사원 도감 및 일괄 육성, 출퇴근 관리 기능을 제공합니다.
 * **`GachaModal.tsx` & `GachaProbModal.tsx`**: 가챠 연출 및 확률 정보를 제공합니다.
-* **`RebirthModal.tsx`**: 환생 상점(탓 상점) 창입니다.
+* **`RebirthModal.tsx`**: 환생 상점(탓 상점) 창입니다. '기본 탓 특성', '심화 남탓 특성', '탓 장비 강화' 탭으로 나뉘어 있습니다. 탓 장비 탭에서는 강화 시도에 따른 흔들림, 성공(빛남/확대), 실패(흑백/하락) 애니메이션 연출을 제공합니다.
 * **`GoldenDiskModal.tsx`**: 획득한 음표를 소모해 전체 스탯을 %로 강화하는 디스크 상점입니다.
 * **`TowerModal.tsx`**: 90층 이후 해금되는 스냅샷 슬롯 기록, 등반, 유물 및 슬롯 오버클럭 강화 UI를 제공합니다.
 * **`LeaderboardModal.tsx`**: Google Sheets API(CSV)를 통해 불러온 상위 5명의 랭킹을 표시합니다.
